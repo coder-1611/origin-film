@@ -64,16 +64,18 @@ void main() {
   tm += lift * (1.0 - tm);
   tm *= mix(1.0, smoothstep(1.25, 0.2, r2 * 1.6), vignette);
   vec3 outc = linearToSrgb(tm);
-  // Pass-through region (used by VIII's screen): no tonemap, no grade: display value as-is.
+  // Pass-through region (used by VIII's screen): no tonemap, no grade, no grain, no dither:
+  // the display value goes out as-is so nested frames stay exact.
+  float keep = 0.0;
   if (maskOn > 0.5) {
-    float m = texture(passMask, vUv).r;
-    outc = mix(outc, linearToSrgb(col), m);
+    keep = texture(passMask, vUv).r;
+    outc = mix(outc, linearToSrgb(col), keep);
   }
   // Film grain: luminance-weighted, seeded by frame (deterministic).
   float gr = hash13(vec3(gl_FragCoord.xy, frameSeed)) + hash13(vec3(gl_FragCoord.yx + 17.0, frameSeed + 0.5)) - 1.0;
-  outc += gr * grain * (0.35 + 0.65 * (1.0 - abs(luma(outc) - 0.45) * 1.6));
+  outc += (1.0 - keep) * gr * grain * (0.35 + 0.65 * (1.0 - abs(luma(outc) - 0.45) * 1.6));
   // Triangular dither to kill banding.
-  outc += (hash13(vec3(gl_FragCoord.xy, frameSeed + 3.1)) + hash13(vec3(gl_FragCoord.xy + 5.3, frameSeed + 7.7)) - 1.0) / 255.0;
+  outc += (1.0 - keep) * (hash13(vec3(gl_FragCoord.xy, frameSeed + 3.1)) + hash13(vec3(gl_FragCoord.xy + 5.3, frameSeed + 7.7)) - 1.0) / 255.0;
   if (uiOn > 0.5) {
     vec4 u = texture(ui, vec2(vUv.x, 1.0 - vUv.y));
     outc = mix(outc, u.rgb, u.a);

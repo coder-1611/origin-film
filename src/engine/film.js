@@ -36,7 +36,7 @@ function stubChapter(id, err) {
 }
 
 export class Film {
-  constructor(canvas, { W = 1920, H = 1080, fps = 60, solo = null, featuresUrl = 'renders/audio-features.json', quality = 1 } = {}) {
+  constructor(canvas, { W = 1920, H = 1080, fps = 60, solo = null, featuresUrl = 'src/assets/audio-features.json', quality = 1 } = {}) {
     Object.assign(this, { canvas, W, H, fps, solo, featuresUrl, quality });
     this.chapters = {};
     this.frameZero = null;

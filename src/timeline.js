@@ -285,13 +285,13 @@ export const titleGlyphTimes = [3.0, 4.2, 5.0, 5.8, 7.0, 7.6];   // O R I G I N
 [[3.0, 1.1, 62], [4.2, 0.75, 69], [5.0, 0.75, 67], [5.8, 1.1, 65], [7.0, 3.4, 64]]
   .forEach(([t, d, m], i) => N(t, d, 'sine', m, i === 0 ? 0.7 : 0.6));
 N(7.6, 2.9, 'sub', 26, 0.55, { swell: true });                     // the "N" swell
-S(7.0, 3.5, 'riser', 1.0, 0, { hardStop: true });
+S(7.0, 3.5, 'riser', 0.75, 0, { hardStop: true });
 export const silence = [10.5, 12.0];                                // digital silence
 
 // ===== II · INFLATION (bars 1-7, 84 BPM) ===================================================
 S(bt(1), 6.0, 'impact', 1.0, 0, { big: true });
 for (let bar = 1; bar <= 7; bar++) {
-  padBar(bar, bar === 1 ? 0.75 : 0.55, 50, 79, 'choir');
+  padBar(bar, bar === 1 ? 0.9 : 0.55, 50, 79, 'choir');
   subBar(bar, 0.8, bar === 1 ? [1] : [1, 3], 38);
 }
 N(bt(1), 0.5, 'kick', 36, 1.0);
@@ -301,7 +301,7 @@ for (let bar = 2; bar <= 7; bar++) {
 S(bt(7), barLen(7), 'riser', 0.45, 0, { soft: true });
 
 // ===== III · FIRST LIGHT (bars 8-17, 84 → 101.5 BPM) =======================================
-for (let bar = 8; bar <= 17; bar++) { padBar(bar, 0.42, 55, 81); subBar(bar, 0.45, [1], 38); }
+for (let bar = 8; bar <= 17; bar++) { padBar(bar, 0.3, 55, 81); subBar(bar, 0.4, [1], 38); }
 {
   // Star births: each is an FM bell pitched to the current chord at a screen position.
   const births = [[8, 1, 0, 0, true]];
@@ -395,7 +395,7 @@ for (let k = 0; k < 16; k++) {
 
 // ===== VI · LIFE (bars 41-54, 120 BPM) =====================================================
 for (let bar = 41; bar <= 54; bar++) {
-  padBar(bar, 0.36, 57, 81);
+  padBar(bar, 0.3, 57, 81);
   subBar(bar, 0.55, bar >= 45 ? [1, 3] : [1], 41);
   // Marimba ostinato: root-5th-octave-3rd cell.
   const ch = CHORDS[chart[bar]];
@@ -405,7 +405,7 @@ for (let bar = 41; bar <= 54; bar++) {
     const n = N(bt(bar, b), 0.4, 'marimba', cell[i], (i % 2 ? 0.28 : 0.38) + 0.05 * R(), { x: (R() * 2 - 1) * 0.3 });
     if (bar >= 45) leafFlushes.push({ t: n.t, midi: n.midi });
   });
-  if (bar >= 45) drums(bar, { kick: [1, 2, 3, 4], hat: bar >= 47 ? [1.5, 2.5, 3.5, 4.5] : [], clap: bar >= 49 ? [2, 4] : [] }, 0.8);
+  if (bar >= 45) drums(bar, { kick: [1, 2, 3, 4], hat: bar >= 47 ? [1.5, 2.5, 3.5, 4.5] : [], clap: bar >= 49 ? [2, 4] : [] }, 0.7);
 }
 for (let bar = 41; bar <= 44; bar++) {
   for (let k = 0; k < 3; k++) {
@@ -441,8 +441,8 @@ export function friezeCamX(t) { return pwl(frieze.truck, t); }
 export function friezeX(wx, t) { return wx - friezeCamX(t); }
 
 for (let bar = 55; bar <= 67; bar++) {
-  padBar(bar, 0.42, 55, 79);
-  subBar(bar, 0.75, eighths(), 38, 0.45);
+  padBar(bar, 0.46, 55, 79);
+  subBar(bar, 0.8, eighths(), 38, 0.45);
   if (bar <= 66) drums(bar, { kick: [1, 2, 3, 4], clap: [2, 4], hat: sixteenths(), ohat: [1.5, 2.5, 3.5, 4.5] }, 1.0);
 }
 drums(67, { kick: [1, 2, 3], snare: sixteenths(3, 4.75) }, 0.9);
@@ -553,7 +553,7 @@ export function globeProject(t, lat, lon, aspect = W / H) {
 S(bt(66, 3), bt(68) - bt(66, 3), 'riser', 0.55, 0, { soft: true });
 
 // ===== VIII · THE PROMPT (bars 68-74, 120 → 60 BPM, then free) =============================
-for (let bar = 68; bar <= 71; bar++) { padBar(bar, 0.34, 55, 76); subBar(bar, 0.45, [1], 38); drums(bar, { kick: [1] }, 0.55); }
+for (let bar = 68; bar <= 71; bar++) { padBar(bar, 0.24, 55, 76); subBar(bar, 0.35, [1], 38); drums(bar, { kick: [1] }, 0.5); }
 
 // Typing schedule: human speed for the first line, then exponential acceleration.
 export const typing = (() => {
@@ -612,7 +612,7 @@ S(ENTER_T, 5.0, 'impact', 0.45, 0, { soft: true });
 export const renderBar = { t0: ENTER_T + 0.3, t1: 171.6 };
 for (let k = 0; k < 12; k++) S(renderBar.t0 + (renderBar.t1 - renderBar.t0) * (k / 11), 0.08, 'tick', 0.18, 0);
 // Rit: the leitmotif on the piano-pluck, resolving only at 176 s (E → D).
-for (let bar = 72; bar <= 74; bar++) padBar(bar, 0.36, 50, 74);
+for (let bar = 72; bar <= 74; bar++) padBar(bar, 0.26, 50, 74);
 subBar(72, 0.5, [1], 38); subBar(73, 0.45, [1], 38); subBar(74, 0.45, [1, 3], 38);
 motif(72, 1, 62, 'minor', 'piano', 0.7);
 N(bt(73, 3), beatsToSec(bt(73, 3), 1.5), 'piano', 57, 0.4);
@@ -721,17 +721,45 @@ export function hudAlpha(t) {
 // Units are each chapter's own world units. Sampled with Catmull-Rom (sampleCamera).
 // Chapter owners edit ONLY their own entry.
 export const cameras = {
+  // I: uniform 1.75 s key spacing (C1-smooth Catmull-Rom); slow dolly, accelerating in the riser.
   I:    [ { t: 0, pos: [0, 0, 6], target: [0, 0, 0], fov: 40, roll: 0 },
-          { t: 10.5, pos: [0, 0, 3.6], target: [0, 0, 0], fov: 40, roll: 0 },
-          { t: 12.2, pos: [0, 0, 3.4], target: [0, 0, 0], fov: 40, roll: 0 } ],
+          { t: 1.75, pos: [0, 0, 5.7725], target: [0, 0, 0], fov: 40, roll: 0 },
+          { t: 3.5, pos: [0, 0, 5.545], target: [0, 0, 0], fov: 40, roll: 0 },
+          { t: 5.25, pos: [0, 0, 5.3175], target: [0, 0, 0], fov: 40, roll: 0 },
+          { t: 7.0, pos: [0, 0, 5.09], target: [0, 0, 0], fov: 40, roll: 0 },
+          { t: 8.75, pos: [0, 0, 4.68], target: [0, 0, 0], fov: 40, roll: 0 },
+          { t: 10.5, pos: [0, 0, 3.9], target: [0, 0, 0], fov: 40, roll: 0 },
+          { t: 12.25, pos: [0, 0, 3.55], target: [0, 0, 0], fov: 40, roll: 0 } ],
   II:   [ { t: 11.9, pos: [0, 0, 0], target: [0, 0, -1], fov: 60, roll: 0 },
           { t: 33.0, pos: [0, 0, -24], target: [0, 0, -25], fov: 60, roll: 12 } ],
-  III:  [ { t: 30.0, pos: [0, 0, 0], target: [0, 0, -1], fov: 55, roll: 0 },
-          { t: 58.6, pos: [0, 0, -40], target: [0, 0, -41], fov: 55, roll: 0 } ],
+  // III: galaxy units (disk radius ≈ 1, disk in XZ). Sampled by ch3/rig.js (log-distance about
+  // target + `anchor` pinning: 'neb' = the nebula, 'sun' = the future Sun), not by sampleCamera.
+  III:  [ { t: 30.0, pos: [-0.421308, 0.002938, 0.367271], target: [-0.423627, 0, 0.350771], fov: 55, roll: 0, anchor: 'neb' },
+          { t: 37.0, pos: [-0.422227, 0.002404, 0.36306], target: [-0.423627, 0, 0.350771], fov: 55, roll: 0, anchor: 'neb' },
+          { t: 42.6, pos: [-0.42286, 0.001871, 0.35954], target: [-0.423627, 0, 0.350771], fov: 55, roll: 0, anchor: 'neb' },
+          { t: 43.5, pos: [-0.422953, 0.002017, 0.359145], target: [-0.423627, 0, 0.350771], fov: 55, roll: 0, anchor: 'neb' },
+          { t: 44.6, pos: [-0.421836, 0.008619, 0.374302], target: [-0.423487, 0, 0.350679], fov: 55, roll: 0, anchor: 'neb' },
+          { t: 45.8, pos: [-0.415389, 0.045, 0.42588], target: [-0.419468, 0, 0.348045], fov: 55, roll: 0, anchor: 'neb' },
+          { t: 47.2, pos: [-0.312966, 0.468391, 0.807188], target: [-0.326584, 0, 0.287165], fov: 55, roll: 0, anchor: 'neb' },
+          { t: 48.6, pos: [0.02, 1.838507, 1.60269], target: [0.02, 0, 0.06], fov: 55, roll: 0, anchor: 'neb' },
+          { t: 50.7, pos: [-0.128015, 1.812425, 1.468264], target: [0.02, 0, 0.06], fov: 55, roll: 0, anchor: 'sun' },
+          { t: 52.3, pos: [0.4138, 0.863557, 1.026669], target: [0.442892, 0.00035, 0.193586], fov: 55, roll: 0, anchor: 'sun' },
+          { t: 54.0, pos: [0.741767, 0.176904, 0.51767], target: [0.707989, 0.000569, 0.277327], fov: 55, roll: 0, anchor: 'sun' },
+          { t: 55.6, pos: [0.755492, 0.021028, 0.327383], target: [0.74444, 0.000599, 0.288841], fov: 55, roll: 0, anchor: 'sun' },
+          { t: 56.6, pos: [0.747734, 0.002848, 0.294509], target: [0.745832, 0.0006, 0.289281], fov: 55, roll: 0, anchor: 'sun' },
+          { t: 57.3, pos: [0.746282, 0.00101, 0.290336], target: [0.74586, 0.0006, 0.28929], fov: 55, roll: 0, anchor: 'sun' },
+          { t: 58.6, pos: [0.746044, 0.000767, 0.289724], target: [0.74586, 0.0006, 0.28929], fov: 55, roll: 0, anchor: 'sun' } ],
   IV:   [ { t: 57.2, pos: [0, 2, 8], target: [0, 0, 0], fov: 45, roll: 0 },
           { t: 83.0, pos: [0, 0.5, 4], target: [0, 0, 0], fov: 45, roll: 0 } ],
-  V:    [ { t: 81.0, pos: [0, 0, 4], target: [0, 0, 0], fov: 40, roll: 0 },
-          { t: 107.0, pos: [0, 0, 1.02], target: [0, 0, 0], fov: 40, roll: 0 } ],
+  // V: planet units (R = 1). 81–84 hold the IV→V disc (r = 0.3056 H at fov 40), then a slow
+  // banking orbit toward the terminator. 96–107 (dive, ocean, underwater) is derived in
+  // src/chapters/ch5/path.js from the 96 s key: altitude spans 5 orders of magnitude (log-space).
+  V:    [ { t: 81.0, pos: [0, 0, 4.6051045], target: [0, 0, 0], fov: 40, roll: 0 },
+          { t: 83.0, pos: [0, 0, 4.6051045], target: [0, 0, 0], fov: 40, roll: 0 },
+          { t: 84.0, pos: [0, 0, 4.6051045], target: [0, 0, 0], fov: 40, roll: 0 },
+          { t: 88.0, pos: [0.38335, -0.11518, 4.38175], target: [0, 0, 0], fov: 40, roll: 6 },
+          { t: 92.0, pos: [0.90935, -0.24725, 3.93884], target: [0, 0, 0], fov: 40, roll: 17 },
+          { t: 96.0, pos: [1.3412, -0.3763, 3.31958], target: [0, 0, 0], fov: 40, roll: 32 } ],
   VI:   [ { t: 105.0, pos: [0, 0, 1], target: [0, 0, 0], fov: 50, roll: 0 },
           { t: 135.0, pos: [0, 0, 1], target: [0, 0, 0], fov: 50, roll: 0 } ],
   VII:  [ { t: 133.0, pos: [0, 0, 1], target: [0, 0, 0], fov: 50, roll: 0 },

@@ -1,22 +1,27 @@
 {
   "name": "origin-film",
   "version": "1.0.0",
-  "main": "index.js",
   "directories": {
     "doc": "docs"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "serve": "node tools/serve-cli.mjs",
+    "audio": "node tools/render-audio.mjs && node tools/master.mjs && node tools/analyze-audio.mjs",
+    "draft": "node tools/render.mjs --draft",
+    "render": "node tools/render.mjs",
+    "verify": "node tools/verify/all.mjs",
+    "snap": "node tools/snap.mjs"
   },
-  "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "ORIGIN: 13.8 billion years in one unbroken camera move. A film written in HTML/JS/GLSL with a score synthesised in code.",
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.3.0",
     "@fontsource/inter": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.3.0",
     "puppeteer-core": "^25.12.0",
     "three": "^0.186.1"
-  }
+  },
+  "type": "module",
+  "private": true
 }

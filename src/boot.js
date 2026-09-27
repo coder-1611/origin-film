@@ -4,7 +4,7 @@ import { Film } from './engine/film.js';
 
 const q = new URLSearchParams(location.search);
 const mode = q.get('mode') || 'live';
-const W = +(q.get('w') || 1920), H = +(q.get('h') || 1080);
+const W = +(q.get('w') || (mode === 'render' ? 1920 : 1280)), H = +(q.get('h') || (mode === 'render' ? 1080 : 720));
 const solo = q.get('solo') ? q.get('solo').split(',') : null;
 
 const FONT_FACES = [

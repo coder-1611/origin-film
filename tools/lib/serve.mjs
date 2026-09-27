@@ -10,6 +10,18 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/ja
 export function serve(port = 0) {
   return new Promise((resolve) => {
     const srv = http.createServer((req, res) => {
+      // POST /__upload?name=foo.f32 → renders/foo.f32 (used by the offline audio render)
+      if (req.method === 'POST' && req.url.startsWith('/__upload')) {
+        const name = path.basename(new URL(req.url, 'http://x').searchParams.get('name') || 'upload.bin');
+        const chunks = [];
+        req.on('data', (c) => chunks.push(c));
+        req.on('end', () => {
+          fs.mkdirSync(path.join(ROOT, 'renders'), { recursive: true });
+          fs.writeFileSync(path.join(ROOT, 'renders', name), Buffer.concat(chunks));
+          res.writeHead(200); res.end('ok');
+        });
+        return;
+      }
       let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
       if (p.endsWith('/')) p += 'index.html';
       const file = path.join(ROOT, p);

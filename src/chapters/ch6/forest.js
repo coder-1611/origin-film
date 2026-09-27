@@ -243,11 +243,13 @@ export function makeForestMeshes(ctx, G, forest) {
       // direction: around the twig heading, drooping a little
       let d = [c.H[0] + (u - 0.5) * 1.6, c.H[1] + (v - 0.5) * 1.2 - 0.25, c.H[2] + (w - 0.5) * 1.6];
       const l = Math.hypot(...d); d = d.map(x => x / l);
-      const off = size * 0.6;
-      const p = [c.p[0] + (LR() - 0.5) * off, c.p[1] + (LR() - 0.5) * off * 0.7, c.p[2] + (LR() - 0.5) * off];
+      // leaves strung back along the twig from its tip, not bunched on one point
+      const back = LR() * size * 2.2;
+      const off = size * 1.1;
+      const p = [c.p[0] - c.H[0] * back + (LR() - 0.5) * off, c.p[1] - c.H[1] * back + (LR() - 0.5) * off * 0.7, c.p[2] - c.H[2] * back + (LR() - 0.5) * off];
       let s = [LR() - 0.5, LR() * 0.3, LR() - 0.5];
       lP.push(...p, size * (0.7 + 0.6 * LR()));
-      lD.push(...d, c.birth + k * 0.012);
+      lD.push(...d, c.birth + k * (c.flush ? 0.035 : 0.02));   // a flush cascades through its buds
       lS.push(...s, LR());
       lC.push(ao, c.flush, tr.sp === 'archaeopteris' ? 1 : (tr.sp === 'shrub' ? 2 : 0), sp.leafAspect);
       lO.push(...tr.pos, 0);
@@ -270,32 +272,33 @@ export function makeForestMeshes(ctx, G, forest) {
   const LEAF_VS = glsl.header + GL_UNIFORMS + /* glsl */`
     in vec3 position; in vec2 uv; in vec4 lP, lD, lS, lC, lO, lG;
     uniform mat4 viewMatrix, projectionMatrix;
-    out vec3 vP; out vec3 vN; out vec2 vUv; out vec4 vC; out float vAge;
+    out vec3 vP; out vec3 vN; out vec2 vUv; out vec4 vC; out float vAge; out float vSeed;
     void main() {
       float age = uT - lD.w;
       if (age < 0.0) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
-      // pop: fast unfurl with a small overshoot
-      float x = clamp(age / 0.42, 0.0, 1.0);
-      float sc = 1.0 - exp(-5.0 * x) * cos(7.5 * x);
-      sc = age > 0.42 ? 1.0 - 0.02 * exp(-5.0 * x) : sc;
-      vec3 d = lD.xyz;
+      // a bud unfolding: the blade extends out of the twig tip, folded upright, then turns out to
+      // its final angle and opens across its width
+      float ext = smoothstep(0.0, 0.8, age);
+      float open = smoothstep(0.15, 1.05, age);
+      float spread = smoothstep(0.05, 1.2, age);
+      vec3 d = normalize(mix(normalize(lD.xyz * 0.35 + vec3(0.0, 1.0, 0.0)), lD.xyz, spread));
       vec3 s = normalize(cross(d, normalize(lS.xyz + vec3(0.0, 0.0, 0.001))));
       float gu = clamp((uT - lG.x) / lG.y, 0.0, 1.0);
       float gs = ${SC0.toFixed(3)} + ${(1 - SC0).toFixed(3)} * pow(gu, ${SC_P.toFixed(3)});
-      float size = lP.w * sc * sqrt(gs);
+      float size = lP.w * (0.18 + 0.82 * ext) * sqrt(gs);
       vec3 base = lO.xyz + (lP.xyz - lO.xyz) * gs;
-      vec3 p = base + d * position.y * size + s * position.x * size * lC.w * 1.6;
+      vec3 p = base + d * position.y * size + s * position.x * size * lC.w * 1.6 * (0.1 + 0.9 * open);
       // flutter
       float flut = 0.015 * (1.0 + 1.2 * uKick + 1.5 * uAudio.z);
       p += vec3(sin(uT * 2.3 + lS.w * 30.0), cos(uT * 1.9 + lS.w * 20.0) * 0.5, sin(uT * 1.7 + lS.w * 11.0)) * flut * position.y * size * 4.0;
-      vP = p; vN = normalize(cross(d, s)); vUv = uv; vC = lC; vAge = age;
+      vP = p; vN = normalize(cross(d, s)); vUv = uv; vC = lC; vAge = age; vSeed = lS.w;
       gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
     }`;
   const leafMat = new THREE.RawShaderMaterial({
     glslVersion: THREE.GLSL3, uniforms: { ...G }, side: THREE.DoubleSide,
     vertexShader: LEAF_VS,
     fragmentShader: glsl.header + GL_UNIFORMS + GL_LIT_AIR + GL_SHADOW + /* glsl */`
-    in vec3 vP; in vec3 vN; in vec2 vUv; in vec4 vC; in float vAge; out vec4 fragColor;
+    in vec3 vP; in vec3 vN; in vec2 vUv; in vec4 vC; in float vAge; in float vSeed; out vec4 fragColor;
     void main() {
       // leaf silhouette: pointed ellipse along uv.y
       float y = vUv.y, x = (vUv.x - 0.5) * 2.0;
@@ -305,21 +308,33 @@ export function makeForestMeshes(ctx, G, forest) {
       vec3 n = normalize(vN);
       if (dot(n, v) > 0.0) n = -n;
       float ao = mix(0.3, 1.0, vC.x);
-      float mature = smoothstep(0.3, 3.5, vAge);
-      vec3 fresh = vec3(0.30, 0.52, 0.06);
-      vec3 old = vC.z > 0.5 && vC.z < 1.5 ? vec3(0.05, 0.13, 0.05) : (vC.z > 1.5 ? vec3(0.10, 0.16, 0.04) : vec3(0.07, 0.15, 0.035));
-      vec3 alb = mix(fresh, old, mature) * (0.85 + 0.3 * abs(x));
-      alb *= 1.0 - 0.25 * (1.0 - smoothstep(0.0, 0.05, abs(x)));     // midrib
+      // colour: each leaf its own green; young leaves yellow-green, maturing over a few seconds
+      float var = fract(vSeed * 7.31), var2 = fract(vSeed * 13.7);
+      vec3 young = mix(vec3(0.26, 0.40, 0.06), vec3(0.20, 0.36, 0.05), var);
+      vec3 matA = vec3(0.045, 0.12, 0.03), matB = vec3(0.085, 0.18, 0.045), matC = vec3(0.12, 0.16, 0.05);
+      vec3 mat = var < 0.5 ? mix(matA, matB, var * 2.0) : mix(matB, matC, var * 2.0 - 1.0);
+      if (vC.z > 0.5 && vC.z < 1.5) mat = mix(mat, vec3(0.035, 0.10, 0.05), 0.6);   // archaeopteris: blue-green fronds
+      if (vC.z > 1.5) mat = mix(mat, vec3(0.10, 0.15, 0.04), 0.5);                   // shrubs
+      float mature = smoothstep(0.6, 4.5, vAge);
+      vec3 alb = mix(young, mat, mature) * (0.8 + 0.25 * var2) * (0.88 + 0.24 * abs(x));
+      alb *= 1.0 - 0.3 * (1.0 - smoothstep(0.0, 0.06, abs(x)));     // midrib
+      alb *= 0.85 + 0.15 * y;                                          // paler toward the tip
       float sh = sunShadow(vP, n) * mix(0.55, 1.0, vC.x);
       vec3 c = litAir(vP, n, alb, ao, sh);
-      // translucency: low sun shining through the leaf toward the eye (only where it reaches)
-      float tr = pow(max(dot(v, uSunDir), 0.0), 4.0) * 1.4 + 0.06;
-      c += alb * vec3(1.0, 1.1, 0.45) * uSunCol * tr * sh * 0.5 * (1.0 - uDusk);
-      // flush glow: fresh leaves on a marimba note flare, the motif notes most of all
-      float fl = vC.y > 1.5 ? 2.2 : (vC.y > 0.5 ? 1.0 : 0.0);
-      float far = clamp(distance(vP, uCamPos) / 35.0, 0.0, 1.0);
-      vec3 flc = mix(vec3(0.75, 1.0, 0.28), vec3(1.0, 0.72, 0.25), (1.0 - smoothstep(0.02, 0.1, uSunDir.y)));
-      c += flc * fl * exp(-vAge / 0.4) * 0.55 * (1.0 + 3.5 * far) * (1.0 - uDusk * 0.5);
+      // translucency: the low sun through the blade (where it reaches), and the sky behind it
+      float tr = pow(max(dot(v, uSunDir), 0.0), 4.0) * 1.3 + 0.05;
+      vec3 trans = alb * vec3(1.0, 1.12, 0.5);
+      c += trans * uSunCol * tr * sh * 0.5 * (1.0 - uDusk);
+      vec3 skyBehind = mix(uSkyHor2, uSkyZen * 1.6, clamp(v.y * 2.5, 0.0, 1.0));
+      c += trans * skyBehind * 0.35 * mix(0.5, 1.0, vC.x) * (1.0 - uDusk);
+      // young leaves are waxy: a small sun glint
+      vec3 rf = reflect(v, n);
+      c += uSunCol * pow(max(dot(rf, uSunDir), 0.0), 30.0) * 0.12 * sh * (1.0 - mature * 0.7) * (1.0 - uDusk);
+      // distant flushes (the sunset headland) would be lost at this size: a soft golden glint there only
+      float fl = vC.y > 1.5 ? 1.6 : (vC.y > 0.5 ? 1.0 : 0.0);
+      float far = smoothstep(18.0, 40.0, distance(vP, uCamPos));
+      vec3 flc = mix(vec3(0.7, 0.95, 0.3), vec3(1.0, 0.72, 0.25), (1.0 - smoothstep(0.02, 0.1, uSunDir.y)));
+      c += flc * fl * far * exp(-vAge / 0.5) * 0.9 * (1.0 - uDusk * 0.5);
       fragColor = vec4(c, distance(vP, uCamPos));
     }`,
   });

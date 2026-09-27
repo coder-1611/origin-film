@@ -45,7 +45,7 @@ void main() {   // 9-tap tent upsample + add the level below
 const COMPOSITE = G.header + G.math + G.hash + G.color + /* glsl */`
 in vec2 vUv; out vec4 fragColor;
 uniform sampler2D scene; uniform sampler2D bloom; uniform sampler2D ui; uniform sampler2D passMask;
-uniform float exposure, bloomStrength, vignette, grain, ca, uiOn, maskOn, frameSeed, aspect, lift, saturation;
+uniform float exposure, bloomStrength, vignette, grain, ca, uiOn, maskOn, frameSeed, aspect, lift, saturation, pulseLift;
 uniform vec3 tint;
 void main() {
   vec2 d = vUv - 0.5;
@@ -64,6 +64,8 @@ void main() {
   tm += lift * (1.0 - tm);
   tm *= mix(1.0, smoothstep(1.25, 0.2, r2 * 1.6), vignette);
   vec3 outc = linearToSrgb(tm);
+  // Kick pulse, part 2: a faint screen-blend lift so the beat still reads on near-black frames.
+  outc = 1.0 - (1.0 - outc) * (1.0 - pulseLift);
   // Pass-through region (used by VIII's screen): no tonemap, no grade, no grain, no dither:
   // the display value goes out as-is so nested frames stay exact.
   float keep = 0.0;
@@ -106,7 +108,7 @@ export class Post {
     this.comp = new Pass(COMPOSITE, {
       scene: { value: null }, bloom: { value: null }, ui: { value: null }, passMask: { value: null },
       exposure: { value: 1 }, bloomStrength: { value: 0.5 }, vignette: { value: 0.3 }, grain: { value: 0.03 }, ca: { value: 0.001 },
-      uiOn: { value: 0 }, maskOn: { value: 0 }, frameSeed: { value: 0 }, aspect: { value: W / H }, lift: { value: 0 }, saturation: { value: 1 },
+      uiOn: { value: 0 }, maskOn: { value: 0 }, frameSeed: { value: 0 }, aspect: { value: W / H }, lift: { value: 0 }, saturation: { value: 1 }, pulseLift: { value: 0 },
       tint: { value: new THREE.Vector3(1, 1, 1) },
     });
     this.blendPass = new Pass(BLEND, { a: { value: null }, b: { value: null }, w: { value: 0 } });
@@ -146,6 +148,7 @@ export class Post {
       passMask: extra.maskTex || this.black.texture, maskOn: extra.maskTex ? 1 : 0,
       exposure: exp, bloomStrength: p.bloom / L.length * 2.2, vignette: p.vignette, grain: p.grain, ca: p.ca,
       uiOn: extra.uiOn ? 1 : 0, frameSeed: extra.frameSeed || 0, aspect: this.W / this.H, lift: p.lift, saturation: p.saturation,
+      pulseLift: Math.min(0.02, (extra.pulse || 0) * 0.06),
       tint: new THREE.Vector3(...p.tint),
     });
   }

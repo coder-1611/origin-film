@@ -63,17 +63,25 @@ ${master.trim()}
 
 ## Hard cuts
 
-${cuts.frames} frames scanned. Frame-to-frame spikes (> 5× local median and > 6/255): **${cuts.spikes.length}**, of which **unsanctioned: ${cuts.unsanctioned}**.
+${cuts.frames} frames scanned (mean |ΔRGB| between consecutive frames at 96×54). A hard cut is an
+**isolated** jump: > 6/255, > 5× the local median and > 2× both neighbouring diffs.
+Isolated jumps: **${cuts.isolated.length}**, of which **unsanctioned: ${cuts.unsanctioned}**.
 
-| t | diff | local median | sanctioned by |
+| t | diff | local median | sanctioned by (timeline.js) |
 |---|---|---|---|
-${cuts.spikes.map(s => `| ${s.t} | ${s.diff} | ${s.localMedian} | ${s.sanctioned || '**NONE**'} |`).join('\n')}
+${cuts.isolated.map(s => `| ${s.t} | ${s.diff} | ${s.localMedian} | ${s.sanctioned || '**NONE**'} |`).join('\n')}
+
+Sustained high-motion runs (fast camera moves: many consecutive large diffs, not cuts):
+
+| from | to | frames | peak diff |
+|---|---|---|---|
+${cuts.sustained.map(s => `| ${s.from} | ${s.to} | ${s.frames} | ${s.peak} |`).join('\n') || '| — | — | — | — |'}
 
 Hand-off windows (largest frame-to-frame diff inside each window vs the median motion in the 3 s before it):
 
-| hand-off | window (s) | max diff | at t | preceding median | unsanctioned spike |
+| hand-off | window (s) | max diff | at t | preceding median | hard cut |
 |---|---|---|---|---|---|
-${cuts.handoffs.map(h => `| ${h.handoff} | ${h.window} | ${h.maxDiff} | ${h.atT} | ${h.precedingMedian} | ${h.spike ? '**YES**' : 'no'} |`).join('\n')}
+${cuts.handoffs.map(h => `| ${h.handoff} | ${h.window} | ${h.maxDiff} | ${h.atT} | ${h.precedingMedian} | ${h.hardCut} |`).join('\n')}
 
 ## Sync proof (kick → visual pulse)
 

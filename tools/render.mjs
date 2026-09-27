@@ -56,7 +56,7 @@ if (!opt('no-encode', false)) {
   if (missing.length) { console.log(`not encoding: ${missing.length} frames missing (first ${missing[0]})`); process.exit(0); }
   const wav = path.join(ROOT, 'renders/score.wav');
   const out = path.join(ROOT, 'renders', outName);
-  const args = ['-y', '-v', 'error', '-stats', '-framerate', String(FPS), '-i', path.join(dir, 'f%05d.jpg'), '-i', wav,
+  const args = ['-y', '-v', 'error', '-framerate', String(FPS), '-i', path.join(dir, 'f%05d.jpg'), '-i', wav,
     '-map', '0:v', '-map', '1:a',
     '-vf', 'scale=in_range=full:out_range=tv:in_color_matrix=bt601:out_color_matrix=bt709,format=yuv420p',
     '-c:v', 'libx264', '-preset', draft ? 'medium' : 'slow', '-crf', '16', '-pix_fmt', 'yuv420p',

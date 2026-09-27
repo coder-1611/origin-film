@@ -35,7 +35,7 @@ vec3 litUnder(vec3 p, vec3 n, vec3 alb, float ao, float causAmt) {
   vec3 att = exp(-SIG_W * dep / max(uSunW.y, 0.25));
   float c = causticAt(p);
   float nl = max(dot(n, uSunW), 0.0);
-  vec3 direct = uSunCol * att * nl * (0.3 + causAmt * 1.7 * c) * 0.85;
+  vec3 direct = uSunCol * att * nl * (0.42 + causAmt * 1.25 * min(c, 2.0)) * 0.85;
   vec3 amb = uUnder * (0.45 + 0.55 * n.y) * exp(-SIG_W * dep * 0.5) * 1.7 * ao;
   return alb * (direct + amb);
 }
@@ -158,11 +158,11 @@ in vec3 vP; in vec3 vN; out vec4 fragColor;`;
       vec2 q = vP.xz;
       vec2 g = vec2(texture(uNoise, q * 0.19 + vec2(uT * 0.021, 0.0)).r - texture(uNoise, q * 0.19 + vec2(0.013, 0.0) + vec2(uT * 0.021, 0.0)).r,
                     texture(uNoise, q * 0.23 + vec2(0.0, uT * 0.017)).g - texture(uNoise, q * 0.23 + vec2(0.0, 0.013) + vec2(0.0, uT * 0.017)).g);
-      vec3 n = normalize(vec3(g.x * 9.0, -1.0, g.y * 9.0));      // faces down
+      vec3 n = normalize(vec3(g.x * 4.5, -1.0, g.y * 4.5));      // faces down
       vec3 t = refract(v, n, 1.333);
       vec3 col;
       vec3 r = reflect(v, n);
-      vec3 refl = waterInscatter(r) * 0.9;
+      vec3 refl = mix(waterInscatter(r), waterInscatter(reflect(v, vec3(0.0, -1.0, 0.0))), 0.45) * 0.9;
       if (dot(t, t) > 0.0 && t.y > 0.0) {
         float F = fresnelSchlick(abs(dot(v, n)), 0.02);
         vec3 sky = skyColor(t, true) * 0.9;

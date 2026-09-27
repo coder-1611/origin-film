@@ -1,6 +1,7 @@
 // Sync proof: for every kick in timeline.js, find (a) the kick's onset in the DELIVERED audio and
-// (b) the visual exposure pulse in the DELIVERED video (largest frame-to-frame luminance rise near
-// the kick), and print the table. Pass = the pulse lands on the first frame at/after the kick
+// (b) the visual exposure pulse in the DELIVERED video (the largest luminance impulse near the
+// kick: each frame's mean luma minus the linear trend of the two frames before it), and print
+// the table. Pass = the pulse lands on the first frame at/after the kick
 // (±1 frame) and within ±1 frame of the measured audio onset.
 import path from 'node:path';
 import fs from 'node:fs';
@@ -36,8 +37,10 @@ const rows = []; let pass = 0;
 for (const tk of T.kicks) {
   if (tk >= T.DURATION) continue;
   const n0 = Math.ceil(tk * fps - 1e-6);
+  // Impulse detector: residual of each frame against the linear trend of the two before it
+  // (second difference), so smooth brightness ramps (dives, fades, draw-ons) cancel out.
   let best = -Infinity, bi = n0;
-  for (let i = Math.max(1, n0 - 3); i <= Math.min(V.n - 1, n0 + 3); i++) { const d = luma[i] - luma[i - 1]; if (d > best) { best = d; bi = i; } }
+  for (let i = Math.max(2, n0 - 3); i <= Math.min(V.n - 1, n0 + 3); i++) { const d = luma[i] - (2 * luma[i - 1] - luma[i - 2]); if (d > best) { best = d; bi = i; } }
   const ao = audioOnset(tk);
   const dFrameKick = bi - n0, dFrameAudio = (bi / fps - ao) * fps;
   const ok = Math.abs(dFrameKick) <= 1 && dFrameAudio > -1 && dFrameAudio < 2 && best > 0;
@@ -45,7 +48,7 @@ for (const tk of T.kicks) {
   const bb = T.barBeat(tk + 1e-6);
   rows.push({ bar: bb.free ? '—' : `${bb.bar}:${bb.beat.toFixed(2)}`, t: tk, audio: ao, frame: bi, dKick: dFrameKick, dAudio: dFrameAudio, dl: best, ok });
 }
-const lines = ['| # | bar:beat | kick t (timeline) | audio onset (measured) | Δ audio | pulse frame (measured) | Δ vs kick frame | Δ vs audio (frames) | Δluma | ok |', '|---|---|---|---|---|---|---|---|---|---|'];
+const lines = ['| # | bar:beat | kick t (timeline) | audio onset (measured) | Δ audio | pulse frame (measured) | Δ vs kick frame | Δ vs audio (frames) | impulse (luma) | ok |', '|---|---|---|---|---|---|---|---|---|---|'];
 rows.forEach((r, i) => lines.push(`| ${i + 1} | ${r.bar} | ${r.t.toFixed(4)} | ${r.audio.toFixed(3)} | ${((r.audio - r.t) * 1000).toFixed(0)} ms | ${r.frame} | ${r.dKick >= 0 ? '+' : ''}${r.dKick} | ${r.dAudio.toFixed(2)} | ${r.dl.toFixed(2)} | ${r.ok ? '✓' : '✗'} |`));
 const summary = `${pass}/${rows.length} kicks: visual pulse within ±1 frame of the kick frame and of the measured audio onset (video ${fps} fps, ${V.n} frames).`;
 fs.writeFileSync(path.join(ROOT, 'tools/verify/out/sync-table.md'), summary + '\n\n' + lines.join('\n') + '\n');

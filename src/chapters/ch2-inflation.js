@@ -29,15 +29,19 @@ let LOGK = {};
 const lpwl = (name, t) => Math.exp(T.pwl(LOGK[name], t));
 
 /** Scale factor: exponential inflation 0 → 0.35 s (×1e4), a soft landing, then slow growth. */
+/** Scale factor: exponential inflation (×1e4) complete in ~2 frames, a soft landing, then a
+ *  decelerating expansion. The bang is frame-exact on the 12.000 downbeat. */
+const INFL = 0.022;
 function aScale(t) {
   const tau = t - 12;
   if (tau <= 0) return 1e-4;
-  const G = Math.log(1e4), lam = G / 0.35, k = 0.9;
+  const G = Math.log(1e4), lam = G / INFL, k = 0.35;
   const x = lam * tau - G;
   const soft = k * x > 30 ? x : Math.log1p(Math.exp(k * x)) / k;       // softplus: the landing
-  const L = -G + lam * tau - soft;                                        // → 0 (a = 1) after inflation
-  const post = 1 + 0.2 * Math.log1p(Math.max(0, tau - 0.3) / 0.9);       // decelerating expansion
-  return Math.exp(L) * post;
+  const L = -G + lam * tau - soft;                                        // → 0 after inflation
+  const coast = 0.62 + 0.38 * (1 - Math.exp(-tau / 0.18));               // the shell decelerates
+  const post = 1 + 0.2 * Math.log1p(Math.max(0, tau - 0.05) / 0.9);      // slow expansion after
+  return Math.exp(L) * coast * post;
 }
 
 function params(ctx, t) {
@@ -45,27 +49,27 @@ function params(ctx, t) {
   const f = ctx.features.at(t);
   const rec = smoother(bt(5) - 0.05, bt(5) + 0.9, t);          // recombination
   const web = smoother(25.6, 29.6, t);
-  const kPre = T.pwl([[12, 0], [12.35, 0.07], [12.8, 0.12], [14, 0.13], [23.5, 0.13]], t);
+  const kPre = T.pwl([[12, 0.01], [12.1, 0.05], [12.4, 0.09], [12.8, 0.12], [14, 0.13], [23.5, 0.13]], t);
   const kPost = T.pwl([[23.4, 0.018], [bt(6), 0.022], [28, 0.034], [30, 0.048], [33, 0.09]], t);
   return {
     tau, rec, web,
     a: aScale(t),
     tempK: lpwl('K', t),
     intensity: lpwl('I', t) * (1 + 0.35 * f.low + 0.25 * f.rms) * Math.min(1, Math.pow(aScale(t) / 0.6, 2)),
-    sheet: 0.95 * sstep(0.3, 1.9, tau) * (1 - web),
+    sheet: 0.95 * sstep(0.05, 1.4, tau) * (1 - web),
     sheetPh: [0.075 * tau, -0.05 * tau, 0.12 * tau],
     kappa: kPre * (1 - rec) + kPost * rec,
     fogLevel: lpwl('fog', t),
     turbA: 0.45 * sstep(0.25, 2.6, tau) * (1 - 0.65 * web) * (1 + 0.5 * f.low),
     shockR: 11 * (1 - Math.exp(-Math.max(0, tau) / 2.0)),
     shockEnv: Math.exp(-Math.max(0, tau) / 1.6) * sstep(0.08, 0.35, tau),
-    limb: 1.5 * Math.exp(-Math.max(0, tau) / 0.35) * sstep(0.0, 0.05, tau),
+    limb: 0.6 * Math.exp(-Math.max(0, tau) / 0.08),
     sizeW: 0.024,
     soft: 0.6 - 0.45 * rec,
     white: 0.45 * (1 - sstep(bt(3), bt(4, 3), t)),
     spark: 1.5 * rec * (1 - web),
     fogMul: 1 - 0.75 * rec,
-    shellGlow: 5 * Math.exp(-Math.max(0, tau) / 0.45),
+    shellGlow: 3 * Math.exp(-Math.max(0, tau) / 0.12),
     glow1: 0.3 * (1 - 0.2 * rec) + 0.3 * web,
     glow2: 0.18 * (1 - 0.2 * rec) + 0.12 * web,
   };
@@ -101,9 +105,9 @@ export default {
     LOGK = {
       K: lk([[12, 60000], [12.5, 40000], [bt(2), 26000], [bt(3), 16500], [bt(4), 9500], [bt(4, 3), 6200],
              [bt(5), 4300], [bt(5, 3), 3100], [bt(6), 2250], [bt(6, 3), 1750], [bt(7), 1400], [33, 1080]]),
-      I: lk([[12, 1.4], [12.35, 0.7], [12.8, 0.6], [13.6, 0.9], [14, 1.1], [bt(3), 0.95], [bt(4), 0.85], [bt(5), 0.8],
+      I: lk([[12, 0.25], [12.05, 0.11], [12.15, 0.13], [12.3, 0.2], [12.6, 0.36], [13.2, 0.7], [14, 1.1], [bt(3), 0.95], [bt(4), 0.85], [bt(5), 0.8],
              [bt(6), 0.6], [bt(7), 0.4], [31, 0.22], [33, 0.1]]),
-      fog: lk([[12, 2.0], [12.25, 0.6], [12.45, 0.24], [13, 0.3], [13.6, 0.45], [14.8, 0.5], [bt(4), 0.45], [bt(5), 0.4], [bt(6), 0.1], [33, 0.06]]),
+      fog: lk([[12, 0.25], [12.05, 0.09], [12.15, 0.11], [12.3, 0.14], [12.6, 0.22], [13.2, 0.36], [13.8, 0.45], [14.8, 0.5], [bt(4), 0.45], [bt(5), 0.4], [bt(6), 0.1], [33, 0.06]]),
     };
     noiseTex = getNoise3D(THREE);
     cam = new THREE.PerspectiveCamera(60, ctx.aspect, 0.05, 200);
@@ -154,7 +158,7 @@ export default {
     compPass = new Pass(glsl.header + glsl.color + S.COMP_FRAG, {
       partTex: { value: partRT.texture }, fogTex: { value: fogRT.texture }, glowA: { value: d4.texture }, glowB: { value: d8.texture },
       on: { value: 1 }, glowGain: { value: 0.3 }, glowGain2: { value: 0.2 },
-      core: { value: new THREE.Vector4() }, res: { value: new THREE.Vector2(W, H) },
+      core: { value: new THREE.Vector4() }, res: { value: new THREE.Vector2(W, H) }, trim: { value: 1 },
     });
 
     // Instanced capsule sprites.
@@ -214,7 +218,9 @@ export default {
     const su = spriteMat.uniforms;
     // While the fireball is only a few pixels across, draw a random subset (particles are
     // hash-ordered) with compensating intensity: identical look, no blend pile-up.
-    const frac = Math.min(1, Math.max(1 / 64, Math.pow(p.a / 0.12, 2)));
+    // Same during the 2-3 frames of peak streak length (energy-conserving capsules, far fewer px).
+    let frac = Math.min(1, Math.max(1 / 64, Math.pow(p.a / 0.12, 2)));
+    frac *= 0.2 + 0.8 * sstep(0.04, 0.1, p.tau);
     spriteGeo.instanceCount = Math.max(1, Math.round(COUNT * frac));
     su.viewProj.value.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
     su.prevViewProj.value.multiplyMatrices(camPrev.projectionMatrix, camPrev.matrixWorldInverse);
@@ -242,11 +248,14 @@ export default {
 
     // The eruption core: from the exact centre pixel at 12.000, sized to the projected fireball,
     // bridging the frames where the inflating particle cloud is still sub-pixel.
-    const dist = cam.position.distanceTo(new THREE.Vector3(...BANG));
-    const rH = 0.5 * (EGG.Rxy * p.a / dist) / Math.tan(Math.PI / 6);
-    const coreI = 40 * Math.exp(-p.tau / 0.12) * (1 - sstep(0.22, 0.4, p.tau));
-    compPass.uniforms.core.value.set(coreI, Math.max(0.0012, 0.55 * rH), 0, 0);
-    compPass.render(r, target, { on: 1, glowGain: p.glow1, glowGain2: p.glow2 });
+    // At 12.000 a white-hot core already fills most of the frame; it swells past the frame
+    // edges and decays in ~3 frames (the engine's flash rides on top).
+    const coreI = 3.0 * Math.exp(-p.tau / 0.018);
+    compPass.uniforms.core.value.set(coreI > 1e-4 ? coreI : 0, 0.33 + 3.0 * p.tau, 0, 0);
+    // The engine multiplies exposure by (1 + flash) at the bang; soften its tail on the plasma so
+    // structure reads from ~12.1 while the flash still visibly decays.
+    const trim = Math.pow(1 + T.flashAt(t), -0.6);
+    compPass.render(r, target, { on: 1, glowGain: p.glow1, glowGain2: p.glow2, trim });
   },
 
   post(t) {

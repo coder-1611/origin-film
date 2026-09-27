@@ -176,7 +176,7 @@ void main() {
   float heat = P.w;
   peak *= 1.0 + 1.5 * heat;
   vec2 dd = s1 - s0; float len = length(dd);
-  float maxLen = 0.45 * res.y;
+  float maxLen = 0.32 * res.y;
   if (len > maxLen) { s0 = s1 - dd / len * maxLen; dd = s1 - s0; len = maxLen; }
   vec2 dir = len > 1e-4 ? dd / len : vec2(1.0, 0.0);
   vec2 nrm = vec2(-dir.y, dir.x);
@@ -316,15 +316,17 @@ uniform sampler2D partTex, fogTex, glowA, glowB;
 uniform float on, glowGain, glowGain2;
 uniform vec4 core;      // eruption core: intensity, radius (H units)
 uniform vec2 res;
+uniform float trim;     // partial compensation of the engine's bang flash (core excluded)
 void main() {
   if (on < 0.5) { fragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
   vec3 c = texture(partTex, vUv).rgb + texture(fogTex, vUv).rgb;
+  vec3 g1 = texture(glowA, vUv).rgb, g2 = texture(glowB, vUv).rgb;
+  c += glowGain * (g1 + g1 * min(luma(g1), 4.0) * 0.5) + glowGain2 * g2;
+  c *= trim;
   if (core.x > 0.0) {
     float r = length(gl_FragCoord.xy - 0.5 * res) / res.y;
     float k = r / max(core.y, 1e-5);
     c += vec3(0.82, 0.9, 1.0) * core.x * (exp(-k * k * 2.0) + 0.25 * exp(-k * 1.2));
   }
-  vec3 g1 = texture(glowA, vUv).rgb, g2 = texture(glowB, vUv).rgb;
-  c += glowGain * (g1 + g1 * min(luma(g1), 4.0) * 0.5) + glowGain2 * g2;
   fragColor = vec4(c, 1.0);
 }`;

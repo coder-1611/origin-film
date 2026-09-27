@@ -137,7 +137,7 @@ function makeComposite(ctx) {
   const pass = new ctx.Pass(ctx.glsl.header + ctx.glsl.math + ctx.glsl.hash + /* glsl */`
     in vec2 vUv; out vec4 fragColor;
     uniform sampler2D wTex, aTex, uNoise; uniform mat4 invProj, camWorld; uniform vec3 camPos;
-    uniform float mode, t, rD, pxw, kick, ember, dusk, aspect;
+    uniform float mode, t, rD, pxw, kick, ember, dusk, aspect, surf, drops;
     float wave(vec2 q) {
       return 0.0045 * sin(q.x * 3.1 + t * 1.9) + 0.003 * sin(q.x * 7.3 - t * 2.7 + 1.3) + 0.0025 * sin(t * 1.3 + 0.4)
            + 0.004 * kick * sin(q.x * 11.0 + t * 9.0);
@@ -165,27 +165,59 @@ function makeComposite(ctx) {
       float s = q.y - wave(q.xz);                       // + above the waterline on the port
       float px = pxw * rD;
       float m = smoothstep(-px, px, s);
-      // the water film clinging above the line refracts the air image downward
-      float film = exp(-max(s, 0.0) / (px * 18.0)) * step(0.0, s);
-      vec3 A = texture(aTex, vUv + vec2(0.0, -film * 0.012)).rgb;
-      A = mix(A, A * vec3(0.8, 0.95, 0.95) + vec3(0.0, 0.01, 0.012), film * 0.5);
+      // the water film clinging above the line refracts the air image downward; while the port
+      // rises through the surface the film is thick, rippled and draining
+      float filmW = px * (18.0 + 110.0 * surf);
+      float film = exp(-max(s, 0.0) / filmW) * step(0.0, s);
+      vec2 fr = (vec2(texture(uNoise, vUv * vec2(6.0, 2.2) + vec2(0.0, t * 0.9)).r, texture(uNoise, vUv * vec2(5.0, 1.7) + vec2(0.3, t * 1.3)).g) - 0.5);
+      vec2 offA = vec2(fr.x * 0.03 * surf, -0.012 - 0.03 * surf + fr.y * 0.02 * surf) * film;
+      vec3 A = texture(aTex, vUv + offA).rgb;
+      A = mix(A, A * vec3(0.8, 0.95, 0.95) + vec3(0.0, 0.01, 0.012), film * (0.5 + 0.3 * surf));
+      // droplets left on the port above the line, sliding down and drying off
+      if (drops > 0.0 && s > px) {
+        vec2 fc = vUv * vec2(aspect, 1.0);
+        float slide = (t - 113.7) * 0.05;
+        for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+          vec2 cell = floor((fc + vec2(0.0, slide)) * 9.0) + vec2(float(i), float(j));
+          vec3 h = vec3(hash12(cell + 0.5), hash12(cell + 7.3), hash12(cell + 13.1));
+          float dw = clamp((0.42 * drops - h.x) / 0.1, 0.0, 1.0);        // each droplet dries off smoothly
+          if (dw <= 0.0) continue;
+          float r = 0.006 + 0.018 * h.y * h.y;
+          vec2 cpos = (cell + 0.2 + 0.6 * vec2(h.y, h.z)) / 9.0 - vec2(0.0, slide * (0.8 + 0.6 * h.z));
+          vec2 dd = (fc - cpos) / r;
+          float l = length(dd);
+          if (l < 1.0) {
+            vec2 luv = vUv - dd * r / vec2(aspect, 1.0) * 1.8;             // a tiny inverted lens image
+            vec3 L = texture(aTex, luv).rgb * 0.9;
+            float rim = smoothstep(0.7, 1.0, l);
+            float hi = exp(-dot(dd - vec2(-0.35, 0.4), dd - vec2(-0.35, 0.4)) * 18.0);
+            vec3 D = mix(L, A * 0.35, rim * 0.8) + vec3(1.0, 0.97, 0.9) * hi * 0.9;
+            A = mix(A, D, dw * (1.0 - smoothstep(0.92, 1.0, l)));
+          }
+        }
+      }
       vec3 Wc = texture(wTex, vUv).rgb;
       vec3 c = mix(Wc, A, m);
-      // meniscus: a dark refracting line with a bright lip catching the sky just above it
+      // meniscus: a dark refracting line with a bright lip catching the sky just above it;
+      // brighter while the surface slides over the lens
       float dark = exp(-pow(s / (px * 3.2), 2.0));
-      float lip = exp(-pow((s - px * 3.5) / (px * 1.4), 2.0));
-      c = c * (1.0 - 0.8 * dark) + A * lip * 0.9 + vec3(0.02, 0.03, 0.03) * lip;
+      float lip = exp(-pow((s - px * 3.5) / (px * (1.4 + 3.0 * surf)), 2.0));
+      c = c * (1.0 - 0.8 * dark) + A * lip * (0.9 + 1.4 * surf) + vec3(0.02, 0.03, 0.03) * lip;
+      c += A * 0.35 * surf * exp(-abs(s) / (px * 25.0));
       fragColor = vec4(finish(c), 1.0);
     }`, { wTex: { value: null }, aTex: { value: null }, uNoise: { value: null }, invProj: { value: new THREE.Matrix4() }, camWorld: { value: new THREE.Matrix4() },
     camPos: { value: new THREE.Vector3() }, mode: { value: 0 }, t: { value: 0 }, rD: { value: RD_PORT }, pxw: { value: 1 }, kick: { value: 0 },
-    ember: { value: 0 }, dusk: { value: 0 }, aspect: { value: ctx.aspect } });
+    ember: { value: 0 }, dusk: { value: 0 }, aspect: { value: ctx.aspect }, surf: { value: 0 }, drops: { value: 0 } });
   return {
     render(r, target, u) {
       const pxw = 2 * Math.tan(camBase.fov * DEG / 2) / ctx.H;
       const t = u.t;
       const ember = T.smootherstep(133.15, 133.6, t);
       const dusk = T.smootherstep(133.3, 134.9, t) * 0.985;
-      pass.render(r, target, { ...u, pxw, uNoise: noise.texture, kick: G.uKick.value, ember, dusk });
+      // surfacing: the port rises through the surface (≈113.6–114.3), leaving droplets that dry off
+      const surf = T.smootherstep(113.72, 113.95, t) * (1 - T.smootherstep(114.2, 114.65, t));
+      const drops = T.smootherstep(113.9, 114.1, t) * (1 - T.smootherstep(114.6, 115.8, t));
+      pass.render(r, target, { ...u, pxw, uNoise: noise.texture, kick: G.uKick.value, ember, dusk, surf, drops });
     },
   };
 }
@@ -256,8 +288,9 @@ export default {
       ys.push(camBase.position.y + v.y * RD_PORT);
     }
     const lo = Math.min(...ys), hi = Math.max(...ys);
-    const needW = lo < 0.03, needA = hi > -0.03;
-    caus.update(r, t * 0.55);
+    const crossing = Math.abs(camBase.position.y) < 0.16;       // render both media through the whole surfacing
+    const needW = lo < 0.03 || crossing, needA = hi > -0.03 || crossing;
+    caus.update(r, t * 0.3);
     const flockOn = t >= TB0;
     cre.fish.visible = cre.birds.visible = cre.drops.visible = flockOn;
     if (flockOn) cre.update(boids, boids.ensure(t), t);

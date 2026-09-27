@@ -122,7 +122,7 @@ export const chapterById = Object.fromEntries(chapters.map(c => [c.id, c]));
 // a smootherstep weight. The match-moves themselves (shared glow, shared disc, shared
 // point…) are each chapter's job, as contracted in STORYBOARD.md.
 export const transitions = [
-  { from: 'I',   to: 'II',   a: 11.95, b: 12.15 },
+  { from: 'I',   to: 'II',   a: 11.96, b: 12.0 },    // the pinprick → the bang, on the downbeat
   { from: 'II',  to: 'III',  a: 30.0,  b: 33.0 },
   { from: 'III', to: 'IV',   a: 57.2,  b: 58.6 },
   { from: 'IV',  to: 'V',    a: 81.0,  b: 83.0 },
@@ -657,6 +657,12 @@ export const flashes = [
   { t: SPLASH_T,  name: 'splash',  dur: 0.35, gain: 1.6 },
   { t: ENTER_T,   name: 'enter',   dur: 0.25, gain: 0.8 },
 ];
+/** Storyboarded sharp visual beats (besides flashes, kick pulses and star births). The cut
+ *  checker allows a single-frame jump only at these, the flashes, kicks and star births. */
+export const storyBeats = [
+  { t: 10.5, name: 'collapse to pinprick', dur: 0.25 },
+  { t: bt(8), name: 'first star ignites', dur: 0.1 },
+];
 /** Exposure pulse per kick (fraction of exposure added at the hit), by chapter. */
 export const pulse = { I: 0, II: 0.22, III: 0.16, IV: 0.16, V: 0.12, VI: 0.12, VII: 0.13, VIII: 0.14, tau: 0.085 };
 export function kickPulse(t) {
@@ -853,20 +859,22 @@ export const cameras = {
           { t: 92.0, pos: [0.84873, -0.23076, 3.67625], target: [0, 0, 0], fov: 40, roll: 17 },
           { t: 96.0, pos: [1.19217, -0.33449, 2.95073], target: [0, 0, 0], fov: 40, roll: 32 } ],
   // VI: metres, sea surface y = 0. Macro on the stromatolite's live colony (patch faces 12° up) →
-  // crane back and up, surfacing at 113.9 → over-under at the waterline (y = 0.004 keeps the
-  // meniscus near centre) → tilt up with the breach → pan to the sun (yaw 50°) and hold level so
-  // the sunset horizon and the ember sit at the exact centre. Authored in src/chapters/ch6/camera.js.
+  // crane back and up, rising through the surface 113.8–114.3 (the waterline sweeps down from the
+  // top edge, ease-out) → over-under at the waterline (y = 0.004 keeps the meniscus near centre) →
+  // tilt up with the breach → pan to the sun (yaw 50°) and hold level so the sunset horizon and
+  // the ember sit at the exact centre. Authored in src/chapters/ch6/camera.js.
   VI:   [ { t: 105, pos: [0, -0.57581, -1.34994], target: [0, -1.19955, -4.28438], fov: 50, roll: 0 },
           { t: 108, pos: [0, -0.57831, -1.36168], target: [0, -1.20204, -4.29612], fov: 50, roll: 0 },
           { t: 110, pos: [0, -0.57997, -1.3695], target: [0, -1.2037, -4.30395], fov: 50, roll: 0 },
           { t: 111.5, pos: [0, -0.5467, -1.213], target: [0, -1.22156, -4.13611], fov: 50, roll: 0 },
-          { t: 112.8, pos: [0, -0.40096, -0.99781], target: [0, -1.42702, -3.81689], fov: 50, roll: 0 },
-          { t: 113.45, pos: [0, -0.22, -0.84644], target: [0, -1.53511, -3.54283], fov: 50, roll: 0 },
-          { t: 113.78, pos: [0, -0.035, 0.08], target: [0, -0.19201, -2.91589], fov: 50, roll: 0 },
-          { t: 113.95, pos: [0, 0.004, 0.2], target: [0, 0.004, -2.8], fov: 50, roll: 0 },
-          { t: 114.3, pos: [0, 0.004, 0.25], target: [0, 0.004, -2.75], fov: 50, roll: 0 },
-          { t: 114.6, pos: [0, 0.004, 0.28], target: [0, 0.004, -2.72], fov: 50, roll: 0 },
-          { t: 118, pos: [0, 0.004, 0.55], target: [0, 0.004, -2.45], fov: 50, roll: 0 },
+          { t: 112.8, pos: [0, -0.4476, -1.07606], target: [0, -1.37465, -3.92923], fov: 50, roll: 0 },
+          { t: 113.45, pos: [0, -0.17, -0.84], target: [0, -1.1467, -3.67656], fov: 50, roll: 0 },
+          { t: 113.8, pos: [0, -0.058, -0.71], target: [0, -0.55314, -3.66886], fov: 50, roll: 0 },
+          { t: 114.05, pos: [0, -0.009, -0.6], target: [0, -0.17646, -3.59532], fov: 50, roll: 0 },
+          { t: 114.3, pos: [0, 0.003, -0.52], target: [0, -0.02842, -3.51984], fov: 50, roll: 0 },
+          { t: 114.6, pos: [0, 0.004, -0.45], target: [0, 0.004, -3.45], fov: 50, roll: 0 },
+          { t: 114.9, pos: [0, 0.004, -0.39], target: [0, 0.004, -3.39], fov: 50, roll: 0 },
+          { t: 118, pos: [0, 0.004, 0.35], target: [0, 0.004, -2.65], fov: 50, roll: 0 },
           { t: 122, pos: [0, 0.004, 0.75], target: [0, 0.004, -2.25], fov: 50, roll: 0 },
           { t: 125.6, pos: [0, 0.004, 0.85], target: [0, 0.004, -2.15], fov: 50, roll: 0 },
           { t: 126.2, pos: [0, 0.03, 0.85], target: [0.05207, 0.34359, -2.13311], fov: 50, roll: 0 },

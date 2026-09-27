@@ -2,7 +2,7 @@
 import { execFileSync } from 'node:child_process';
 export function decodeFrames(file, w, h, fmt = 'gray') {
   const bpp = fmt === 'gray' ? 1 : 3;
-  const buf = execFileSync('ffmpeg', ['-v', 'error', '-i', file, '-vf', `scale=${w}:${h}:flags=area,format=${fmt === 'gray' ? 'gray' : 'rgb24'}`, '-f', 'rawvideo', '-'], { maxBuffer: 1 << 31 });
+  const buf = execFileSync('ffmpeg', ['-v', 'error', '-i', file, '-vf', `scale=${w}:${h}:flags=area,format=${fmt === 'gray' ? 'gray' : 'rgb24'}`, '-f', 'rawvideo', '-'], { maxBuffer: 2 ** 32 });
   const size = w * h * bpp, n = Math.floor(buf.length / size);
   return { n, size, frame: (i) => buf.subarray(i * size, (i + 1) * size) };
 }

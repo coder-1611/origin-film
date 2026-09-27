@@ -10,7 +10,7 @@ const m = (s, ...p) => ({ s, p });
 export const SPECIES = {
   // Sympodial ternary tree with gravitropism (ABoP fig. 2.8): the broadleaf.
   broadleaf: {
-    iterations: 6, tropism: [0, -1, 0], e: 0.20, leafOrder: 2, twig: [2, 0.5], clusterLeaves: 9, leafSize: 0.20, leafAspect: 0.55,
+    iterations: 6, tropism: [0, -1, 0], e: 0.20, leafOrder: 2, twig: [2, 0.5], clusterLeaves: 12, leafSize: 0.13, leafAspect: 0.5,
     axiom: [m('!', 1), m('F', 200), m('/', 45), m('A')],
     rules: {
       A: (p, R) => {
@@ -27,7 +27,7 @@ export const SPECIES = {
   // Monopodial tree (Honda's model, ABoP fig. 2.6) with near-horizontal fronded branches: an
   // Archaeopteris-like "first tree".
   archaeopteris: {
-    iterations: 9, tropism: [0, -1, 0], e: 0.10, leafOrder: 1, twig: [1, 0.9], clusterLeaves: 8, leafSize: 0.26, leafAspect: 0.3,
+    iterations: 9, tropism: [0, -1, 0], e: 0.10, leafOrder: 1, twig: [1, 0.9], clusterLeaves: 10, leafSize: 0.18, leafAspect: 0.3,
     axiom: [m('A', 1, 10)],
     rules: {
       A: ([l, w], R) => [m('!', w), m('F', l), m('['), m('&', (62 + 10 * R()) * D), m('B', l * 0.62, w * 0.707), m(']'), m('/', (137.5 + 8 * (R() - 0.5)) * D), m('A', l * 0.9, w * 0.707)],
@@ -37,7 +37,7 @@ export const SPECIES = {
   },
   // Small bushy plant for the shore edge.
   shrub: {
-    iterations: 4, tropism: [0, 1, 0], e: 0.05, leafOrder: 1, twig: [2, 0.5], clusterLeaves: 8, leafSize: 0.16, leafAspect: 0.5,
+    iterations: 4, tropism: [0, 1, 0], e: 0.05, leafOrder: 1, twig: [2, 0.5], clusterLeaves: 10, leafSize: 0.11, leafAspect: 0.5,
     axiom: [m('!', 1), m('F', 40), m('A')],
     rules: {
       A: (p, R) => {

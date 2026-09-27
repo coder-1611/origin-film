@@ -867,7 +867,7 @@ function drawGlobe(ctx, t, env, sc) {
   const settle = sm5(150.45, 151.7, t);
   const frontI = (0.3 * (1 - settle) + 0.045 * settle) * (1 - sstep(156.5, 158.0, t));
   const backI = 0.1 * (1 - sm5(150.1, 150.9, t));
-  if (t < 158.3 && rN > 1e-3) {
+  if (t < 158.3) {                 // no radius guard: at 149.0+ r is ~0 for a few frames, the engine must still draw
     const pose = t < 150.9 ? itemPose(eng, t, env) : null;
     const [EAX, EAY] = itemAnchor(ctx, eng, t);
     const K = U.K;

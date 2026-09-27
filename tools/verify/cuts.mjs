@@ -34,6 +34,24 @@ for (let i = 1; i < V.n; i++) {
   else { run.to = t; run.frames++; run.peak = Math.max(run.peak, +diff[i].toFixed(2)); run.sanctioned = run.sanctioned || sanction(i * f); }
 }
 if (run) sustained.push(run);
+// Dropout/glitch detector (A→B→A): frames i..i+g-1 (g ≤ 3) that differ strongly from frame i-1
+// while frame i+g returns close to frame i-1. Catches flickers that the isolated-jump test misses
+// because both edges of the glitch are big. Kick pulses/flashes are excluded (they decay, not return).
+const dist = (a, b) => { const A = V.frame(a), B = V.frame(b); let s = 0; for (let k = 0; k < A.length; k++) s += Math.abs(A[k] - B[k]); return s / A.length; };
+const glitches = [];
+for (let i = 1; i < V.n - 4; i++) {
+  const d0 = diff[i];
+  if (d0 < 5) continue;
+  for (let g = 1; g <= 3; g++) {
+    const back = dist(i - 1, i + g);
+    if (back < 0.45 * d0 && diff[i + g] > 0.6 * d0) {
+      const t = +(i * f).toFixed(3);
+      const sn = sanction(i * f);   // kick pulses and star births brighten-and-decay; they never excuse a dropout
+      glitches.push({ t, frames: g, jump: +d0.toFixed(2), returnDiff: +back.toFixed(2), sanctioned: sn && /^(flash|story)/.test(sn) ? sn : null });
+      i += g; break;
+    }
+  }
+}
 const handoffs = T.transitions.map(tr => {
   const a = Math.floor(tr.a * fps), b = Math.ceil(tr.b * fps);
   let mx = 0, at = a; for (let i = a; i <= b && i < V.n; i++) if (diff[i] > mx) { mx = diff[i]; at = i; }
@@ -42,10 +60,12 @@ const handoffs = T.transitions.map(tr => {
   return { handoff: `${tr.from}→${tr.to}`, window: `${tr.a}–${tr.b}`, maxDiff: +mx.toFixed(2), atT: +(at * f).toFixed(3), precedingMedian: +(ctx[ctx.length >> 1] || 0).toFixed(2), hardCut: cut ? `at ${cut.t}` : 'none' };
 });
 const unsanctioned = isolated.filter(s => !s.sanctioned);
-const report = { frames: V.n, fps, isolated, unsanctioned: unsanctioned.length, sustained, handoffs };
+const report = { frames: V.n, fps, isolated, unsanctioned: unsanctioned.length, sustained, glitches, unsanctionedGlitches: glitches.filter(g => !g.sanctioned).length, handoffs };
 fs.writeFileSync(path.join(ROOT, 'tools/verify/out/cuts.json'), JSON.stringify(report, null, 2));
 console.log(`isolated jumps: ${isolated.length} | unsanctioned: ${unsanctioned.length}`);
 for (const s of isolated) console.log(`  t=${s.t}  diff ${s.diff} (local median ${s.localMedian})  ${s.sanctioned || 'UNSANCTIONED'}`);
 console.log(`sustained high-motion runs (camera moves, not cuts): ${sustained.length}`);
 for (const s of sustained) console.log(`  ${s.from}–${s.to}  ${s.frames} frames, peak ${s.peak}${s.sanctioned ? '  (' + s.sanctioned + ')' : ''}`);
+console.log(`dropout glitches (A→B→A): ${glitches.length}`);
+for (const g of glitches) console.log(`  t=${g.t}  ${g.frames} frame(s), jump ${g.jump}, returns within ${g.returnDiff}  ${g.sanctioned || 'UNSANCTIONED'}`);
 console.table(handoffs);

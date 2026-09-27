@@ -77,6 +77,9 @@ Sustained high-motion runs (fast camera moves: many consecutive large diffs, not
 |---|---|---|---|
 ${cuts.sustained.map(s => `| ${s.from} | ${s.to} | ${s.frames} | ${s.peak} |`).join('\n') || '| — | — | — | — |'}
 
+Dropout glitches (A→B→A: up to 3 frames that jump away and then return): **${cuts.glitches.length}**, unsanctioned **${cuts.unsanctionedGlitches}**.
+${cuts.glitches.map(g => `* t=${g.t}: ${g.frames} frame(s), jump ${g.jump}, returns within ${g.returnDiff} (${g.sanctioned || '**UNSANCTIONED**'})`).join('\n')}
+
 Hand-off windows (largest frame-to-frame diff inside each window vs the median motion in the 3 s before it):
 
 | hand-off | window (s) | max diff | at t | preceding median | hard cut |

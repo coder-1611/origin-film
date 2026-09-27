@@ -9,7 +9,10 @@ const file = process.argv[2] || path.join(ROOT, 'renders/origin.mp4');
 const out = process.argv[3] || path.join(ROOT, 'docs/contact-sheet.jpg');
 const dir = path.join(ROOT, 'tools/verify/out/cs');
 fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
-execFileSync('ffmpeg', ['-v', 'error', '-i', file, '-vf', 'fps=1/2:round=down,scale=384:-2', '-q:v', '3', path.join(dir, 'c%03d.jpg')]);
+// Exact frames by index (frame n shows t = n/fps): every 2 s = every 2·fps frames.
+const [fn, fd] = execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=r_frame_rate', '-of', 'csv=p=0', file]).toString().trim().replace(/,$/, '').split('/').map(Number);
+const fps = fn / (fd || 1);
+execFileSync('ffmpeg', ['-v', 'error', '-i', file, '-vf', `select='not(mod(n\\,${Math.round(fps * 2)}))',scale=384:-2`, '-fps_mode', 'vfr', '-q:v', '3', path.join(dir, 'c%03d.jpg')]);
 const files = fs.readdirSync(dir).filter(f => f.endsWith('.jpg')).sort();
 const cells = files.map((f, i) => {
   const t = i * 2, c = T.chapterAt(t + 1e-3);

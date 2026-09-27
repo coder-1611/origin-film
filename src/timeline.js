@@ -434,8 +434,9 @@ export const frieze = {
     { name: 'press',  wx: 4.0, t0: bt(59), t1: bt(61) },
     { name: 'engine', wx: 6.0, t0: bt(61), t1: bt(63) },
   ],
-  // camera truck (frieze units; 2 units = one screen width)
-  truck: [[bt(55), 0.0], [bt(61), 6.0], [bt(62), 6.18], [bt(63), 6.2]],
+  // camera truck (frieze units; 2 units = one screen width): hold on each plate while it is
+  // drawn and animated, glide to the next between them (clanks 142–145, hisses from 146).
+  truck: [[bt(55), 0.0], [136.2, 0.0], [137.6, 2.0], [140.4, 2.0], [141.6, 4.0], [145.2, 4.0], [146.0, 6.0], [bt(63), 6.2]],
 };
 export function friezeCamX(t) { return pwl(frieze.truck, t); }
 export function friezeX(wx, t) { return wx - friezeCamX(t); }
@@ -545,7 +546,7 @@ export function globeProject(t, lat, lon, aspect = W / H) {
   });
   for (const a of arcs) {
     const [, lat, lon] = cities[a.to];
-    const p = globeProject(a.t + a.dur, lat, lon);
+    const p = globeProject(a.t + a.dur * 0.92, lat, lon);   // where the landing flash is
     a.x = Math.max(-1, Math.min(1, p.x));
     S(a.t + a.dur * 0.92, 0.25, 'zap', a.converge ? 0.32 : 0.4, a.x, { midi: 84 + (a.to * 5) % 12 });
   }
@@ -783,16 +784,22 @@ export const cameras = {
           { t: 62, pos: [41.7881, 18.3562, -11.0692], target: [1.6942, 0, 0.4236], fov: 44, roll: 0 },
           { t: 62.35, pos: [41.8217, 17.4216, -9.9923], target: [1.9718, 0, 0.4929], fov: 44, roll: 0 },
           { t: 62.7, pos: [41.3203, 16.5539, -8.9522], target: [2.1958, 0, 0.549], fov: 44, roll: 0 },
-          { t: 63.05, pos: [40.6119, 15.9239, -8.068], target: [2.3455, 0, 0.5864], fov: 44, roll: 0 },
-          { t: 63.3, pos: [40.1706, 15.6924, -7.583], target: [2.3953, 0, 0.5988], fov: 44, roll: 0 },
-          { t: 63.6, pos: [37.9387, 14.5324, -7.0498], target: [2.3953, 0, 0.5988], fov: 43.9539, roll: 0 },
-          { t: 63.9, pos: [31.1124, 11.0106, -6.1939], target: [2.4191, 0, 0.5974], fov: 43.6944, roll: 0 },
-          { t: 64.2, pos: [22.6366, 6.7028, -7.0752], target: [3.166, 0.0015, 0.5521], fov: 43.1605, roll: 0 },
-          { t: 64.5, pos: [14.7947, 2.7121, -7.741], target: [5.3685, 0.0058, 0.4187], fov: 42.4133, roll: 0 },
-          { t: 64.8, pos: [9.7849, 0.0788, -5.6558], target: [8.1347, 0.0113, 0.251], fov: 41.5867, roll: 0 },
-          { t: 65.1, pos: [8.3384, -0.7445, -3.1679], target: [9.698, 0.0143, 0.1563], fov: 40.8395, roll: 0 },
-          { t: 65.4, pos: [8.373, -0.765, -2.0239], target: [9.8165, 0.0146, 0.1491], fov: 40.3056, roll: 0 },
-          { t: 65.7, pos: [8.5372, -0.6917, -1.7005], target: [9.8165, 0.0146, 0.1491], fov: 40.0461, roll: 0 },
+          { t: 62.9, pos: [40.9192, 16.1548, -8.4216], target: [24.7343, 9.3859, -4.6528], fov: 44, roll: 0 },
+          { t: 63.1, pos: [40.2068, 15.8141, -9.1395], target: [24.3611, 9.1931, -5.066], fov: 43.9522, roll: 0 },
+          { t: 63.3, pos: [37.4723, 14.4657, -10.72], target: [22.9774, 8.5067, -5.8095], fov: 43.8174, roll: 0 },
+          { t: 63.5, pos: [32.8297, 12.1358, -12.2289], target: [20.7236, 7.3774, -6.2871], fov: 43.6085, roll: 0 },
+          { t: 63.7, pos: [27.1752, 9.2569, -12.872], target: [18.0792, 6.0063, -6.2926], fov: 43.3383, roll: 0 },
+          { t: 63.9, pos: [21.6186, 6.3879, -12.348], target: [15.5427, 4.6179, -5.8659], fov: 43.0198, roll: 0 },
+          { t: 64.1, pos: [16.9846, 3.9595, -10.8785], target: [13.4142, 3.3566, -5.1697], fov: 42.6659, roll: 0 },
+          { t: 64.3, pos: [13.6043, 2.1584, -8.9467], target: [11.7997, 2.2915, -4.3479], fov: 42.2894, roll: 0 },
+          { t: 64.5, pos: [11.4001, 0.9605, -7.0065], target: [10.6914, 1.4504, -3.5063], fov: 41.9033, roll: 0 },
+          { t: 64.7, pos: [10.0926, 0.2319, -5.3355], target: [10.0115, 0.8283, -2.7335], fov: 41.5203, roll: 0 },
+          { t: 64.9, pos: [9.3756, -0.181, -4.0333], target: [9.6389, 0.393, -2.0907], fov: 41.1535, roll: 0 },
+          { t: 65.1, pos: [9.0039, -0.4044, -3.0871], target: [9.4488, 0.1007, -1.5976], fov: 40.8157, roll: 0 },
+          { t: 65.3, pos: [8.8124, -0.5251, -2.4367], target: [9.3476, -0.0899, -1.2408], fov: 40.5198, roll: 0 },
+          { t: 65.5, pos: [8.7037, -0.5954, -2.0165], target: [9.2824, -0.2116, -0.9952], fov: 40.2786, roll: 0 },
+          { t: 65.7, pos: [8.6297, -0.6418, -1.7733], target: [9.232, -0.2869, -0.8407], fov: 40.1051, roll: 0 },
+          { t: 65.9, pos: [8.5806, -0.6706, -1.6682], target: [9.1974, -0.3264, -0.7666], fov: 40.0122, roll: 0 },
           { t: 66, pos: [8.5723, -0.6752, -1.6569], target: [9.8165, 0.0146, 0.1491], fov: 40, roll: 0 },
           { t: 66.4, pos: [8.6134, -0.6824, -1.6482], target: [9.817, 0.0145, 0.1449], fov: 40, roll: 0 },
           { t: 66.8, pos: [8.6726, -0.6921, -1.6342], target: [9.818, 0.0144, 0.1388], fov: 40, roll: 0 },
@@ -845,8 +852,32 @@ export const cameras = {
           { t: 88.0, pos: [0.37464, -0.11256, 4.28217], target: [0, 0, 0], fov: 40, roll: 6 },
           { t: 92.0, pos: [0.84873, -0.23076, 3.67625], target: [0, 0, 0], fov: 40, roll: 17 },
           { t: 96.0, pos: [1.19217, -0.33449, 2.95073], target: [0, 0, 0], fov: 40, roll: 32 } ],
-  VI:   [ { t: 105.0, pos: [0, 0, 1], target: [0, 0, 0], fov: 50, roll: 0 },
-          { t: 135.0, pos: [0, 0, 1], target: [0, 0, 0], fov: 50, roll: 0 } ],
+  // VI: metres, sea surface y = 0. Macro on the stromatolite's live colony (patch faces 12° up) →
+  // crane back and up, surfacing at 113.9 → over-under at the waterline (y = 0.004 keeps the
+  // meniscus near centre) → tilt up with the breach → pan to the sun (yaw 50°) and hold level so
+  // the sunset horizon and the ember sit at the exact centre. Authored in src/chapters/ch6/camera.js.
+  VI:   [ { t: 105, pos: [0, -0.57581, -1.34994], target: [0, -1.19955, -4.28438], fov: 50, roll: 0 },
+          { t: 108, pos: [0, -0.57831, -1.36168], target: [0, -1.20204, -4.29612], fov: 50, roll: 0 },
+          { t: 110, pos: [0, -0.57997, -1.3695], target: [0, -1.2037, -4.30395], fov: 50, roll: 0 },
+          { t: 111.5, pos: [0, -0.5467, -1.213], target: [0, -1.22156, -4.13611], fov: 50, roll: 0 },
+          { t: 112.8, pos: [0, -0.40096, -0.99781], target: [0, -1.42702, -3.81689], fov: 50, roll: 0 },
+          { t: 113.45, pos: [0, -0.22, -0.84644], target: [0, -1.53511, -3.54283], fov: 50, roll: 0 },
+          { t: 113.78, pos: [0, -0.035, 0.08], target: [0, -0.19201, -2.91589], fov: 50, roll: 0 },
+          { t: 113.95, pos: [0, 0.004, 0.2], target: [0, 0.004, -2.8], fov: 50, roll: 0 },
+          { t: 114.3, pos: [0, 0.004, 0.25], target: [0, 0.004, -2.75], fov: 50, roll: 0 },
+          { t: 114.6, pos: [0, 0.004, 0.28], target: [0, 0.004, -2.72], fov: 50, roll: 0 },
+          { t: 118, pos: [0, 0.004, 0.55], target: [0, 0.004, -2.45], fov: 50, roll: 0 },
+          { t: 122, pos: [0, 0.004, 0.75], target: [0, 0.004, -2.25], fov: 50, roll: 0 },
+          { t: 125.6, pos: [0, 0.004, 0.85], target: [0, 0.004, -2.15], fov: 50, roll: 0 },
+          { t: 126.2, pos: [0, 0.03, 0.85], target: [0.05207, 0.34359, -2.13311], fov: 50, roll: 0 },
+          { t: 126.8, pos: [0.05, 0.2, 0.9], target: [0.19558, 1.32382, -1.87774], fov: 50, roll: 0 },
+          { t: 127.7, pos: [0.15, 0.5, 0.95], target: [0.76651, 1.72021, -1.72039], fov: 48, roll: 0 },
+          { t: 128.6, pos: [0.3, 1, 1], target: [1.73446, 1.87712, -1.48455], fov: 44, roll: 0 },
+          { t: 129.6, pos: [0.4, 1.4, 1], target: [2.43074, 1.76561, -1.17771], fov: 35, roll: 0 },
+          { t: 130.6, pos: [0.4, 1.5, 1], target: [2.69813, 1.5, -0.92836], fov: 27, roll: 0 },
+          { t: 131.5, pos: [0.4, 1.5, 1], target: [2.69813, 1.5, -0.92836], fov: 25.5, roll: 0 },
+          { t: 134, pos: [0.4, 1.5, 1], target: [2.69813, 1.5, -0.92836], fov: 22.5, roll: 0 },
+          { t: 135, pos: [0.4, 1.5, 1], target: [2.69813, 1.5, -0.92836], fov: 22, roll: 0 } ],
   VII:  [ { t: 133.0, pos: [0, 0, 1], target: [0, 0, 0], fov: 50, roll: 0 },
           { t: 160.6, pos: [0, 0, 1], target: [0, 0, 0], fov: 50, roll: 0 } ],
   // VIII: metres (desk top y = 0). 159.2–160.3 the caret held at the exact centre (targets on the

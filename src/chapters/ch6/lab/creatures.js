@@ -26,6 +26,7 @@ const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * 
 const fract = (x) => x - Math.floor(x);
 const TAU = Math.PI * 2;
 const rotZ = (v, a) => [v[0] * Math.cos(a) - v[1] * Math.sin(a), v[0] * Math.sin(a) + v[1] * Math.cos(a), v[2]];
+const rotAbout = (a, b, ang) => add(a, rotZ(sub(b, a), ang));
 const dir2 = (deg) => [Math.cos(deg * Math.PI / 180), Math.sin(deg * Math.PI / 180), 0];
 // deterministic hash for per-cycle variation (breaks perfect mirror/loop symmetry)
 const hsh = (n) => { let x = (n | 0) ^ 0x9E3779B9; x = Math.imul(x ^ (x >>> 16), 0x85EBCA6B); x = Math.imul(x ^ (x >>> 13), 0xC2B2AE35); return ((x ^ (x >>> 16)) >>> 0) / 4294967296; };
@@ -55,6 +56,7 @@ export function ik2(A, T, l1, l2, P) {
 class Rig {
   constructor() { this.p = []; this.group = 'x'; this.cnt = {}; }
   cone(a, b, ra, rb, { k = 0.0, kind = 0, thick = 0, far = 0 } = {}) {
+    if (kind === 5 && this.noCuts) return;
     const g = this.group, i = this.cnt[g] = (this.cnt[g] || 0) + 1;
     this.p.push({ a, b, ra, rb, k, kind, thick: thick || 2 * Math.max(ra, rb), far, slot: g + ':' + (i - 1) });
   }
@@ -91,12 +93,22 @@ function digits(rig, base, fwd, n, lenD, r0, spreadDeg, curl, opt, lengths) {
   for (let i = 0; i < n; i++) {
     const f = n === 1 ? 0 : i / (n - 1) - 0.5;
     const a = f * spreadDeg * Math.PI / 180;
-    const dx = fwd[0] * Math.cos(a), dz = Math.sin(a) * 0.9 + fwd[2];
+    const fu = opt.fanUp || 0;
+    let dx = fwd[0] * Math.cos(a), dz = Math.sin(a) * 0.9 + fwd[2];
+    if (fu) dx = Math.cos(a * (1 + fu * 0.25));
+    const up = fu * Math.abs(Math.sin(a)) * 0.9;
     const L = lenD * (lengths ? lengths[i] : 1);
-    const mid = add(base, nrm([dx, 0.15 * curl, dz]), L * 0.55);
-    const tip = add(mid, nrm([dx, -0.6 * curl - 0.1, dz]), L * 0.5);
+    const mid = add(base, nrm([dx, 0.15 * curl + up, dz * (1 - fu * 0.7)]), L * 0.55);
+    const tip = add(mid, nrm([dx, -0.6 * curl - 0.1 + up * 0.6, dz * (1 - fu * 0.7)]), L * 0.5);
     rig.cone(base, mid, r0, r0 * 0.75, opt);
     rig.cone(mid, tip, r0 * 0.75, r0 * 0.35, opt);
+    if (opt.claw) {
+      // a hooked claw: out along the digit, then curving down to a fine point
+      const cd = nrm([dx, -0.35 - 0.4 * curl, dz]);
+      const c1 = add(tip, cd, opt.claw * 0.6), c2 = add(c1, nrm([dx * 0.4, -1, dz * 0.4]), opt.claw * 0.55);
+      rig.cone(tip, c1, r0 * 0.4, r0 * 0.22, { ...opt, k: 0 });
+      rig.cone(c1, c2, r0 * 0.22, r0 * 0.02, { ...opt, k: 0 });
+    }
   }
 }
 
@@ -118,85 +130,108 @@ function spinePoints(ctrl, n) {
 // 1 · TIKTAALIK-like tetrapodomorph (~2 m): crutching on both pectoral fins in phase
 // (mudskipper-like: push 45 %, recovery 52 %, stride ≈ 0.27 body length), body surging,
 // head pitching up on the push, tail sweeping; flat crocodile head with eyes on top.
-function tiktaalik(t) {
-  const G = { T: 1.4, duty: 0.5, v: 0.38, surge: 0.85, surgePh: 0.0 };
+function tiktaalik(t, ov = {}) {
+  const G = { T: 1.4, duty: 0.5, v: 0.38, surge: 0.85, surgePh: 0.0, ...(ov.G || {}) };
+  const finOffs = ov.finOffs || [0, 0];
+  const call = ov.call || 0;
   const r = new Rig();
   const X = bodyX(G, t);
   const ph = fract(t / G.T);
-  const push = Math.sin(Math.PI * clamp(ph / 0.5)) * (ph < 0.5 ? 1 : 0);   // 0..1 during the push
-  const rec = ph >= 0.5 ? Math.sin(Math.PI * (ph - 0.5) / 0.5) : 0;
+  // alternating fins push twice per cycle; in-phase crutching once
+  const ph2 = finOffs[0] === finOffs[1] ? ph : fract(ph * 2);
+  const push = Math.sin(Math.PI * clamp(ph2 / 0.5)) * (ph2 < 0.5 ? 1 : 0);   // 0..1 during the push
+  const rec = ph2 >= 0.5 ? Math.sin(Math.PI * (ph2 - 0.5) / 0.5) : 0;
   const lift = 0.05 * push;                                               // fins lift the chest
   const hp = 0.10, chestY = 0.16 + lift;
   const pel = [0, hp, 0], sh = [0.72, chestY, 0];
-  const headPitch = (4 + 10 * push - 3 * rec) * Math.PI / 180;
+  const headPitch = (4 + 10 * push - 3 * rec + 16 * call) * Math.PI / 180;
   const neck = add(sh, [0.12, 0.012 + lift * 0.2, 0]);
   const hd = [Math.cos(headPitch), Math.sin(headPitch), 0];
   const snout = add(neck, hd, 0.3);
   const tailSway = Math.sin(TAU * (t / G.T) + 1.2);
   const tl = (u) => [-0.95 * u, hp - 0.02 * u + 0.04 * u * u * tailSway, 0.18 * u * u * tailSway];
-  const ctrl = [
-    { p: tl(1.0), r: 0.008 }, { p: tl(0.7), r: 0.028 }, { p: tl(0.4), r: 0.055 }, { p: tl(0.15), r: 0.075 },
-    { p: pel, r: 0.085 }, { p: [0.36, (hp + chestY) / 2 - 0.005, 0], r: 0.105 }, { p: sh, r: 0.108 },
-    { p: neck, r: 0.095 },
-  ];
-  const sp = spinePoints(ctrl, 16);
+  r.noCuts = true;
+  // body: one smooth, continuous curve from the tail tip to the flat head (dense spline samples)
+  const tailR = (u) => 0.006 + 0.079 * Math.pow(1 - u, 1.35);
+  const ctrl = [];
+  for (const u of [1.0, 0.85, 0.7, 0.55, 0.4, 0.25, 0.12]) ctrl.push({ p: tl(u), r: tailR(u) });
+  ctrl.push({ p: pel, r: 0.086 }, { p: [0.24, hp + 0.012 - 0.008, 0], r: 0.098 }, { p: [0.5, (hp + chestY) / 2 - 0.006, 0], r: 0.106 },
+    { p: sh, r: 0.108 }, { p: neck, r: 0.094 });
+  const sp = spinePoints(ctrl, 30);
   r.group = 'spine';
   r.chain(sp.map(s => s.p), sp.map(s => s.r), { k: 0.03 });
   r.group = 'head';
-  // head: flat wedge (two side-by-side cones give width in 3D; the profile stays low)
-  for (const zz of [-0.045, 0.045]) {
-    r.cone(add(neck, [0, -0.005, zz]), add(snout, [0, -0.012, zz * 0.4]), 0.07, 0.022, { k: 0.04 });
-  }
-  r.cone(add(neck, [0.02, -0.03, 0]), add(snout, [-0.03, -0.028, 0]), 0.055, 0.016, { k: 0.03 });       // lower jaw
-  // eyes on top of the skull (crocodile-like) + an eye cut for the silhouette
-  const eye = add(add(neck, hd, 0.2), [0, 0.058, 0]);
-  r.cone(add(eye, [-0.02, -0.01, 0]), eye, 0.02, 0.018, { k: 0.025 });
-  // mouth slit
-  r.cone(add(add(neck, hd, 0.12), [0, -0.033, 0.07]), add(snout, [-0.02, -0.02, 0.07]), 0.0022, 0.0015, { kind: 5 });
+  // a broad, flat skull (low profile) with a rounded snout, the eyes on bumps on top, a heavy jaw
+  const hup = [-hd[1], hd[0], 0];
+  const H = (u, h) => add(add(neck, hd, u * 0.34), hup, h);
+  const sk = [[0.0, 0.004, 0.085], [0.3, 0.008, 0.07], [0.62, 0.004, 0.052], [0.88, -0.004, 0.036], [1.0, -0.008, 0.028]];
+  for (let i = 0; i < sk.length - 1; i++) r.cone(H(sk[i][0], sk[i][1]), H(sk[i + 1][0], sk[i + 1][1]), sk[i][2], sk[i + 1][2], { k: 0.02 });
+  const hinge = H(0.04, -0.035), gape = -0.3 * call;
+  const Jw = (p) => rotAbout(hinge, p, gape);
+  r.cone(Jw(H(0.04, -0.035)), Jw(H(0.55, -0.042)), 0.06, 0.036, { k: 0.018 });
+  r.cone(Jw(H(0.55, -0.042)), Jw(H(0.97, -0.03)), 0.036, 0.02, { k: 0.012 });
+  r.cone(H(0.46, 0.058), H(0.52, 0.06), 0.024, 0.02, { k: 0.012 });                                     // eye bump
+  r.cone(H(0.3, 0.06), H(0.46, 0.066), 0.012, 0.016, { k: 0.012 });                                     // brow ridge to the eye
   r.group = 'x';
-  // tail fin fringe: dorsal + ventral membranes with rays
-  for (let i = 0; i < 9; i++) {
-    const u = 0.35 + i * 0.075, s = tl(u), s2 = tl(u + 0.075);
-    const hgt = 0.02 + 0.07 * (u - 0.35) / 0.65;
-    r.cone(add(s, [0, 0.02, 0]), add(s2, [-0.03, 0.03 + hgt, 0]), 0.006, 0.005, { kind: 1, thick: 0.009, k: 0.035 });
-    r.cone(add(s, [0, -0.02, 0]), add(s2, [-0.03, -0.025 - hgt * 0.7, 0]), 0.006, 0.005, { kind: 1, thick: 0.009, k: 0.035 });
+  // tail fin: dorsal and ventral membranes (one continuous band each) on fine bony rays that reach
+  // just past the edge; taller toward the tip, rounding off
+  const finH = (u) => (0.014 + 0.07 * Math.min(1, Math.max(0, (u - 0.28) / 0.55))) * (1 - 0.45 * Math.max(0, (u - 0.9) / 0.14));
+  for (const sg of [1, -0.72]) {
+    const M = [];
+    for (let i = 0; i <= 16; i++) {
+      const u = 0.26 + i * (0.78 / 16), rr = tailR(Math.min(u, 1)), h = finH(u) * Math.abs(sg);
+      M.push({ p: add(tl(Math.min(u, 1.04)), [0, Math.sign(sg) * (rr * 0.6 + h * 0.5), 0]), r: h * 0.5 + rr * 0.3 });
+    }
+    for (let i = 0; i < M.length - 1; i++) r.cone(M[i].p, M[i + 1].p, M[i].r, M[i + 1].r, { kind: 1, thick: 0.0045, k: 0.006 });
+    const NR = 30;
+    for (let i = 0; i < NR; i++) {
+      const u = 0.27 + i * (0.76 / (NR - 1)), rr = tailR(Math.min(u, 1)), h = finH(u) * Math.abs(sg);
+      const base = add(tl(u), [0, Math.sign(sg) * rr * 0.7, 0]), tip = add(tl(Math.min(1.04, u + 0.04)), [0, Math.sign(sg) * (rr * 0.6 + h * 1.06), 0]);
+      r.cone(base, tip, 0.0024, 0.0008, { k: 0.001 });
+    }
   }
-  r.cone(add(tl(0.95), [0, 0.0, 0]), add(tl(1.1), [0, 0.03, 0]), 0.05, 0.03, { kind: 1, thick: 0.009, k: 0.04 });
-  r.cone(add(tl(0.95), [0, 0.0, 0]), add(tl(1.1), [0, -0.03, 0]), 0.045, 0.028, { kind: 1, thick: 0.009, k: 0.04 });
-  // dorsal scale ridge
-  for (let i = 0; i < 12; i++) {
-    const s = sp[4 + (i % 8)].p;
-    if (i > 7) break;
-    r.cone(add(s, [0, sp[4 + i].r * 0.85, 0]), add(s, [-0.02, sp[4 + i].r + 0.012, 0]), 0.006, 0.001, { kind: 3, k: 0.01 });
+  // a fine scale ridge along the back
+  for (let i = 9; i < 25; i++) {
+    const a = sp[i];
+    r.cone(add(a.p, [0, a.r * 0.9, 0]), add(a.p, [-0.012, a.r + 0.009, 0]), 0.004, 0.0004, { kind: 3, k: 0.001 });
   }
-  // pectoral fins (both in phase): shoulder → elbow → fin blade planted on the mud
+  // pectoral limbs: shoulder → elbow → wrist, then a splayed hand of eight digits webbed together
+  const feet = [];
   for (const side of [1, -1]) {
     const far = side < 0 ? 1 : 0;
     r.group = side > 0 ? 'LF' : 'RF';
     const hip = add(sh, [-0.02, -0.06, 0.08 * side]);
-    const f = footTrack(G, t, 0.0, sh[0] + 0.1, 0.07);
+    const f = footTrack(G, t, side > 0 ? finOffs[0] : finOffs[1], sh[0] + 0.1, 0.07);
     const foot = [f.x - X, 0.012 + f.y, 0.22 * side];
+    feet.push({ id: side > 0 ? 'LF' : 'RF', x: f.x, psi: f.psi, stance: f.stance, z: foot[2] });
     const { knee } = ik2(hip, foot, 0.16, 0.14, [0.2, 1, 0.6 * side]);
-    r.cone(hip, knee, 0.042, 0.032, { k: 0.03, far });
-    r.cone(knee, foot, 0.032, 0.02, { k: 0.02, far });
-    // fin blade: a fan of rays with membrane between, splayed back along the ground
-    for (let i = 0; i < 7; i++) {
-      const a = (-35 + i * 11) * Math.PI / 180;
-      const tip = add(foot, [Math.cos(a + Math.PI) * -0.12 + 0.02, -0.006 + 0.03 * f.y / 0.07, Math.sin(a) * 0.05 * side]);
-      r.cone(foot, tip, 0.012, 0.003, { kind: 1, thick: 0.003, far, k: 0.018 });
+    r.cone(hip, knee, 0.044, 0.03, { k: 0.03, far });
+    r.cone(knee, foot, 0.03, 0.02, { k: 0.02, far });
+    const lift = f.stance ? 0 : f.y / 0.07;
+    // eight digits fanned out from the wrist (forward, down to the mud, and back), webbed
+    const dg = (i) => {
+      const a = (-10 + i * 24) * Math.PI / 180, L = 0.09 * (0.72 + 0.28 * Math.sin(Math.PI * i / 7));
+      return add(foot, [Math.cos(a) * L, -0.004 + Math.max(0, Math.sin(a)) * L * 0.55 + 0.012 * lift, (0.3 - 0.08 * i) * 0.04 * side]);
+    };
+    for (let i = 0; i < 8; i++) {
+      const tip = dg(i);
+      r.cone(foot, tip, 0.0055, 0.0016, { k: 0.002, far });
+      if (i < 7) r.cone(foot, mixv(mixv(tip, dg(i + 1), 0.5), foot, 0.15), 0.013, 0.006, { kind: 1, thick: 0.0045, k: 0.004, far });   // web
     }
   }
-  // pelvic fins: small, trailing, paddling half a cycle later
+  // pelvic fins: small rayed paddles, half a cycle later
   for (const side of [1, -1]) {
     const far = side < 0 ? 1 : 0;
     r.group = side > 0 ? 'LH' : 'RH';
     const base = add(pel, [0.02, -0.05, 0.06 * side]);
     const sw = Math.sin(TAU * (t / G.T + 0.5));
-    const tip = add(base, [-0.14, -0.03 + 0.02 * sw, 0.06 * side]);
-    r.cone(base, tip, 0.028, 0.006, { k: 0.02, far });
-    r.cone(add(base, [-0.04, -0.01, 0]), add(tip, [-0.02, -0.02, 0]), 0.008, 0.012, { kind: 1, thick: 0.002, far });
+    for (let i = 0; i < 5; i++) {
+      const tip = add(base, [-0.12 - 0.01 * i, -0.045 + 0.012 * i + 0.02 * sw, 0.06 * side]);
+      r.cone(base, tip, 0.006, 0.0015, { k: 0.002, far });
+      if (i < 4) r.cone(base, add(base, [-0.12 - 0.01 * i - 0.005, -0.039 + 0.012 * i + 0.02 * sw, 0.06 * side]), 0.014, 0.005, { kind: 1, thick: 0.0045, k: 0.003, far });
+    }
   }
-  return { rig: r, X, height: 0.34, len: 2.1, center: [0.1, 0.14], water: 0.035, G };
+  return { rig: r, X, height: 0.34, len: 2.1, center: [0.1, 0.14], water: 0.035, G, feet };
 }
 
 // Generic quadruped / biped builder ---------------------------------------------------------
@@ -223,18 +258,37 @@ function quadruped(t, P) {
     return [-Math.cos(a) * tail.len * u, P.hp + bob + Math.sin(a) * tail.len * u + (tail.curl || 0) * u * u * u + (tail.vwave || 0) * wv, lat(-u * 0.5) + wv];
   };
   const nk = P.neck;
-  const neckDir = dir2(nk.deg + (P.headNod || 0) * Math.sin(TAU * 2 * cyc + 0.6));
+  const call = P.call || 0;
+  r.noCuts = !!P.noCuts;
+  const neckDir = dir2(nk.deg + (P.headNod || 0) * Math.sin(TAU * 2 * cyc + 0.6) * (1 - call) + (P.callDeg || 14) * call);
   const neckBase = add(sh, [0.02 * P.scale, P.trunkR[2] * 0.25, 0]);
   const neckTop = add(neckBase, neckDir, nk.len);
-  const ctrl = [
-    { p: tailPt(1.0), r: tail.r1 }, { p: tailPt(0.66), r: mix(tail.r0, tail.r1, 0.6) }, { p: tailPt(0.33), r: mix(tail.r0, tail.r1, 0.25) },
-    { p: add(pel, [0, 0, lat(0)]), r: P.trunkR[0] },
-    { p: add(mixv(pel, sh, 0.5), [0, -(P.bellySag || 0), lat(0.5)]), r: P.trunkR[1] },
-    { p: add(sh, [0, 0, lat(1)]), r: P.trunkR[2] },
-    { p: neckBase, r: nk.r0 },
-    { p: neckTop, r: nk.r1 },
-  ];
-  const sp = spinePoints(ctrl, 16);
+  let ctrl;
+  if (tail.n) {
+    // many tail control points with a concave taper (r0 → r1 as (1−u)^pow): a tail that tapers
+    // along a curve instead of a straight cone
+    ctrl = [];
+    for (let i = tail.n; i >= 1; i--) { const u = i / tail.n; ctrl.push({ p: tailPt(u), r: tail.r1 + (tail.r0 - tail.r1) * Math.pow(1 - u, tail.pow || 1.6) }); }
+  } else ctrl = [{ p: tailPt(1.0), r: tail.r1 }, { p: tailPt(0.66), r: mix(tail.r0, tail.r1, 0.6) }, { p: tailPt(0.33), r: mix(tail.r0, tail.r1, 0.25) }];
+  ctrl.push({ p: add(pel, [0, 0, lat(0)]), r: P.trunkR[0] });
+  if (P.trunkR.length > 3) {
+    // deep-chested bodies: a fuller belly and a chest dropping below the shoulder line
+    ctrl.push({ p: add(mixv(pel, sh, 0.33), [0, -(P.bellySag || 0) * 0.8, lat(0.33)]), r: P.trunkR[1] });
+    ctrl.push({ p: add(mixv(pel, sh, 0.7), [0, -(P.bellySag || 0), lat(0.7)]), r: P.trunkR[2] });
+    ctrl.push({ p: add(sh, [0, 0, lat(1)]), r: P.trunkR[3] });
+  } else {
+    ctrl.push({ p: add(mixv(pel, sh, 0.5), [0, -(P.bellySag || 0), lat(0.5)]), r: P.trunkR[1] });
+    ctrl.push({ p: add(sh, [0, 0, lat(1)]), r: P.trunkR[2] });
+  }
+  ctrl.push({ p: neckBase, r: nk.r0 });
+  if (nk.s) {
+    // S-curved neck: the lower third bows forward, the upper third back, the head juts forward
+    const pp = [-neckDir[1], neckDir[0], 0];
+    ctrl.push({ p: add(add(neckBase, neckDir, nk.len * 0.36), pp, -nk.s), r: mix(nk.r0, nk.r1, 0.4) });
+    ctrl.push({ p: add(add(neckBase, neckDir, nk.len * 0.72), pp, nk.s * 0.8), r: mix(nk.r0, nk.r1, 0.75) });
+  }
+  ctrl.push({ p: neckTop, r: nk.r1 });
+  const sp = spinePoints(ctrl, P.spineS || 16);
   r.group = 'spine';
   r.chain(sp.map(s => s.p), sp.map(s => s.r), { k: P.bodyK || 0.02 * P.scale, kind: P.fur ? 2 : 0 });
   // limbs
@@ -253,10 +307,11 @@ function quadruped(t, P) {
   for (const lb of limbs) { r.group = lb.id; buildLimb(r, lb, P, t); }
   // head & extras
   r.group = 'head';
-  P.head(r, { neckTop, neckDir, sh, pel, t, cyc, X, sp, bob, scale: P.scale });
+  P.head(r, { neckTop, neckDir, sh, pel, t, cyc, X, sp, bob, scale: P.scale, call });
   r.group = 'x';
-  if (P.extras) P.extras(r, { sp, sh, pel, t, cyc, X, limbs, tailPt, scale: P.scale });
-  return { rig: r, X, height: P.frameH, len: P.frameL, center: P.center, G };
+  if (P.extras) P.extras(r, { sp, sh, pel, t, cyc, X, limbs, tailPt, scale: P.scale, P });
+  const feet = limbs.map(lb => ({ id: lb.id, x: lb.f.x, psi: lb.f.psi, stance: lb.f.stance, z: lb.foot[2] }));
+  return { rig: r, X, height: P.frameH, len: P.frameL, center: P.center, G, feet };
 }
 
 function buildLimb(r, { L, side, far, root, foot, f }, P) {
@@ -271,9 +326,26 @@ function buildLimb(r, { L, side, far, root, foot, f }, P) {
     const ankle = add(foot, [-Math.cos(ang) * L.l3 * back, Math.sin(ang) * L.l3, 0]);
     const { knee } = ik2(root, ankle, L.l1, L.l2, pole);
     r.cone(root, knee, L.r[0], L.r[1], opt);
-    r.cone(knee, ankle, L.r[1], L.r[2], opt);
+    if (L.bow) {
+      // the shank bows gently forward and the calf swells behind it: no straight trapezoids
+      const sd = nrm(sub(ankle, knee)), fw = nrm([sd[1], -sd[0], 0]);
+      const mid = add(mixv(knee, ankle, 0.45), fw[0] > 0 ? fw : scl(fw, -1), L.bow);
+      r.cone(knee, mid, L.r[1], mix(L.r[1], L.r[2], 0.55), opt);
+      r.cone(mid, ankle, mix(L.r[1], L.r[2], 0.55), L.r[2], opt);
+    } else r.cone(knee, ankle, L.r[1], L.r[2], opt);
+    if (L.thighMass) {
+      // the drumstick: a muscular mass behind the femur, flowing into the knee
+      const td = nrm(sub(knee, root));
+      let bk = nrm(cross(td, [0, 0, 1])); if (bk[0] > 0) bk = scl(bk, -1);
+      r.cone(add(add(root, td, L.l1 * 0.12), bk, L.thighMass[0] * 0.25), add(add(root, td, L.l1 * 0.72), bk, L.thighMass[1] * 0.35), L.thighMass[0], L.thighMass[1], { ...opt, k: (L.k ?? 0.012) * 1.6 });
+    }
+    if (L.calfMass) {
+      const sd = nrm(sub(ankle, knee));
+      let bk = nrm(cross(sd, [0, 0, 1])); if (bk[0] > 0) bk = scl(bk, -1);
+      r.cone(add(add(knee, sd, L.l2 * 0.08), bk, L.calfMass[0] * 0.45), add(add(knee, sd, L.l2 * 0.55), bk, L.calfMass[1] * 0.2), L.calfMass[0], L.calfMass[1], { ...opt, k: (L.k ?? 0.012) * 1.4 });
+    }
     r.cone(ankle, foot, L.r[2], L.r[3], opt);
-    if (L.toes) digits(r, foot, [1, 0, 0], L.toes, L.toeLen, L.r[3] * 0.75, L.toeSpread || 40, f.stance ? 0.4 : 1, { ...opt, k: opt.k * 0.5 }, L.toeLens);
+    if (L.toes) digits(r, foot, [1, 0, 0], L.toes, L.toeLen, L.r[3] * 0.75, L.toeSpread || 40, f.stance ? 0.4 : 1, { ...opt, k: opt.k * 0.5, claw: L.claw || 0 }, L.toeLens);
     if (L.paw) r.cone(add(foot, [-L.paw * 0.3, L.paw * 0.35, 0]), add(foot, [L.paw * 0.55, L.paw * 0.15, 0]), L.paw * 0.42, L.paw * 0.3, opt);
   } else if (L.type === 'plantigrade') {
     // foot = heel → ball → toe. Stance: flat, then the heel rises about the ball (toe-off);
@@ -323,27 +395,33 @@ function buildLimb(r, { L, side, far, root, foot, f }, P) {
     r.cone(root, knee, L.r[0], L.r[1], opt);
     r.cone(knee, add(foot, [0, L.l3 || 0, 0]), L.r[1], L.r[2], opt);
     if (L.l3) r.cone(add(foot, [0, L.l3, 0]), foot, L.r[2], L.r[3], opt);
-    if (L.toes) digits(r, foot, nrm([1, 0, 0.5 * side]), L.toes, L.toeLen, L.r[3] * 0.7, L.toeSpread || 120, f.stance ? 0.35 : 0.9, { ...opt, k: opt.k * 0.4 }, L.toeLens);
+    if (L.toes) digits(r, foot, nrm([1, 0, 0.5 * side]), L.toes, L.toeLen, L.r[3] * 0.7, L.toeSpread || 120, f.stance ? 0.35 : 0.9, { ...opt, k: opt.k * 0.4, fanUp: L.fanUp || 0 }, L.toeLens);
   }
 }
 
 // head builders -----------------------------------------------------------------------------
-function salamanderHead(r, { neckTop, neckDir }) {
-  const s = 1;
-  const d = nrm(add(neckDir, [0, -0.15, 0]));
-  const tip = add(neckTop, d, 0.021 * s);
-  r.cone(neckTop, tip, 0.0088 * s, 0.0058 * s, { k: 0.004 * s });
-  r.cone(add(neckTop, [0, -0.002 * s, 0]), add(tip, [-0.002 * s, -0.0025 * s, 0]), 0.007 * s, 0.004 * s, { k: 0.003 * s });
-  const eye = add(add(neckTop, d, 0.012 * s), [0, 0.0062 * s, 0]);
-  r.cone(eye, add(eye, [0.002 * s, 0.001 * s, 0]), 0.0032 * s, 0.003 * s, { k: 0.003 * s });
-  r.cone(add(add(neckTop, d, 0.006 * s), [0, -0.004 * s, 0.01 * s]), add(tip, [-0.002 * s, -0.0035 * s, 0.01 * s]), 0.00045 * s, 0.00035 * s, { kind: 5 });
+function salamanderHead(r, { neckTop, neckDir, call = 0 }) {
+  // broad, flat, rounded skull; eyes on bumps on top; a wide jaw (the throat pumps on the croak)
+  if (call > 0.01) {
+    const sac = add(neckTop, [-0.004, -0.009 - 0.004 * call, 0.003]);
+    r.cone(add(sac, [-0.003, 0.002, 0]), add(sac, [0.006, 0.0, 0]), 0.0045 * call, 0.0065 * call, { kind: 6, thick: 0.009, k: 0.003 });
+  }
+  const d = nrm(add(neckDir, [0, -0.12, 0]));
+  const up = [-d[1], d[0], 0];
+  const H = (u, h) => add(add(neckTop, d, u * 0.022), up, h);
+  r.cone(H(0, 0.0005), H(0.55, 0.0008), 0.0088, 0.0072, { k: 0.002 });
+  r.cone(H(0.55, 0.0008), H(1.0, -0.0006), 0.0072, 0.0046, { k: 0.0015 });
+  r.cone(H(1.0, -0.0006), H(1.1, -0.0012), 0.0046, 0.0034, { k: 0.001 });                    // rounded snout
+  const hinge = H(0.05, -0.003);
+  r.cone(hinge, rotAbout(hinge, H(1.0, -0.0035), -0.25 * call), 0.0068, 0.0036, { k: 0.0015 });
+  r.cone(H(0.42, 0.0072), H(0.5, 0.0074), 0.0028, 0.0024, { k: 0.0012 });                    // eye bump
 }
-function lizardHead(r, { neckTop, neckDir, cyc }) {
+function lizardHead(r, { neckTop, neckDir, cyc, call = 0 }) {
   const s = 1;
   const d = nrm(add(neckDir, [0, -0.25, 0]));
   const tip = add(neckTop, d, 0.05 * s);
   r.cone(neckTop, tip, 0.0125 * s, 0.0035 * s, { k: 0.004 * s });
-  r.cone(add(neckTop, [-0.004 * s, -0.006 * s, 0]), add(tip, [-0.006 * s, -0.004 * s, 0]), 0.009 * s, 0.002 * s, { k: 0.003 * s });
+  r.cone(add(neckTop, [-0.004 * s, -0.006 * s, 0]), rotAbout(add(neckTop, [-0.004 * s, -0.006 * s, 0]), add(tip, [-0.006 * s, -0.004 * s, 0]), -0.55 * call), 0.009 * s, 0.002 * s, { k: 0.003 * s });
   // jowl / dewlap
   r.cone(add(neckTop, [-0.008 * s, -0.008 * s, 0]), add(neckTop, [0.012 * s, -0.016 * s, 0]), 0.004 * s, 0.002 * s, { kind: 6, thick: 0.0015 * s, k: 0.004 * s });
   const eye = add(add(neckTop, d, 0.022 * s), [0, 0.0065 * s, 0]);
@@ -371,9 +449,26 @@ const DEFS = {
     hp: 0.0115, shH: 0.012, shX: 0.052, trunkR: [0.0068, 0.0088, 0.0078], bellySag: 0.0015, undulate: 0.012, travel: 0.1,
     neck: { len: 0.009, deg: 2, r0: 0.0075, r1: 0.0085 },
     tail: { len: 0.115, r0: 0.0068, r1: 0.0008, deg: -4, droop: 0.05, wave: 0.01, lag: 0.25, vwave: 0.15 },
-    hind: { type: 'sprawl', l1: 0.012, l2: 0.011, width: 0.006, sprawl: 0.014, lift: 0.006, pole: [0, 1, 0.8], r: [0.0036, 0.0028, 0.0022, 0.0017], toes: 5, toeLen: 0.0058, toeSpread: 110, toeLens: [0.6, 0.9, 1.1, 1.0, 0.7] },
-    fore: { type: 'sprawl', l1: 0.0095, l2: 0.0095, width: 0.006, sprawl: 0.013, lift: 0.006, pole: [-0.2, 1, 0.8], r: [0.003, 0.0024, 0.0019, 0.0015], toes: 4, toeLen: 0.0045, toeSpread: 100, toeLens: [0.7, 1, 1, 0.75] },
-    head: salamanderHead, frameH: 0.035, frameL: 0.2, center: [0.0, 0.016],
+    hind: { type: 'sprawl', l1: 0.012, l2: 0.011, width: 0.006, sprawl: 0.014, lift: 0.006, pole: [0, 1, 0.8], r: [0.0036, 0.0028, 0.0022, 0.0017], toes: 5, toeLen: 0.0066, toeSpread: 150, toeLens: [0.6, 0.9, 1.1, 1.0, 0.7], fanUp: 0.8 },
+    fore: { type: 'sprawl', l1: 0.0095, l2: 0.0095, width: 0.006, sprawl: 0.013, lift: 0.006, pole: [-0.2, 1, 0.8], r: [0.003, 0.0024, 0.0019, 0.0015], toes: 4, toeLen: 0.0052, toeSpread: 140, toeLens: [0.7, 1, 1, 0.75], fanUp: 0.8 },
+    head: salamanderHead, frameH: 0.035, frameL: 0.2, center: [0.0, 0.016], noCuts: 1, spineS: 30,
+    extras(r, { tailPt, sp }) {
+      // a low newt crest along the tail (dorsal and ventral bands) on fine rays, taller toward the tip
+      const h = (u) => 0.0012 + 0.0042 * Math.min(1, Math.max(0, (u - 0.12) / 0.6)) * (1 - 0.5 * Math.max(0, (u - 0.85) / 0.15));
+      const rad = (u) => 0.0068 * Math.pow(1 - u, 1.1) + 0.0008;
+      for (const sg of [1, -0.6]) {
+        const M = [];
+        for (let i = 0; i <= 18; i++) { const u = 0.1 + i * 0.9 / 18, hh = h(u) * Math.abs(sg); M.push({ p: add(tailPt(u), [0, Math.sign(sg) * (rad(u) * 0.55 + hh * 0.5), 0]), r: hh * 0.5 + rad(u) * 0.25 }); }
+        for (let i = 0; i < M.length - 1; i++) r.cone(M[i].p, M[i + 1].p, M[i].r, M[i + 1].r, { kind: 1, thick: 0.0045, k: 0.0006 });
+        const N = 34;
+        for (let i = 0; i < N; i++) {
+          const u = 0.11 + i * 0.88 / (N - 1), hh = h(u) * Math.abs(sg);
+          r.cone(add(tailPt(u), [0, Math.sign(sg) * rad(u) * 0.6, 0]), add(tailPt(Math.min(1, u + 0.03)), [0, Math.sign(sg) * (rad(u) * 0.55 + hh * 1.08), 0]), 0.00026, 0.0001, { k: 0.0001 });
+        }
+      }
+      // subtle costal grooves read as a gently undulating back line
+      for (let i = 12; i < 22; i++) { const a = sp[i]; r.cone(add(a.p, [0, a.r * 0.75, 0]), add(a.p, [0.0015, a.r * 0.95, 0]), a.r * 0.28, a.r * 0.2, { k: 0.0008 }); }
+    },
   },
   // 3 · lizard, 0.45 m: walking trot (diagonal pairs), duty 0.6, belly clear of the ground, crest
   lizard: {
@@ -381,58 +476,96 @@ const DEFS = {
     hp: 0.036, shH: 0.038, shX: 0.088, trunkR: [0.012, 0.0165, 0.015], bellySag: 0.002, undulate: 0.016, travel: 0.6, bob: 0.0015,
     neck: { len: 0.022, deg: 12, r0: 0.0125, r1: 0.011 },
     tail: { len: 0.3, r0: 0.0115, r1: 0.0008, deg: -9, droop: -0.12, curl: 0.004, wave: 0.03, lag: 0.3 },
-    hind: { type: 'sprawl', l1: 0.03, l2: 0.03, l3: 0.006, width: 0.009, sprawl: 0.03, lift: 0.014, pole: [0.3, 1, 0.7], r: [0.0068, 0.0045, 0.0032, 0.0024], toes: 5, toeLen: 0.017, toeSpread: 95, toeLens: [0.45, 0.7, 0.9, 1.15, 0.6] },
-    fore: { type: 'sprawl', l1: 0.022, l2: 0.023, l3: 0.004, width: 0.008, sprawl: 0.024, lift: 0.012, pole: [-0.3, 1, 0.7], r: [0.0052, 0.0036, 0.0026, 0.002], toes: 5, toeLen: 0.009, toeSpread: 100, toeLens: [0.5, 0.8, 1, 0.9, 0.6] },
+    hind: { type: 'sprawl', l1: 0.03, l2: 0.03, l3: 0.006, width: 0.009, sprawl: 0.03, lift: 0.014, pole: [0.3, 1, 0.7], r: [0.0068, 0.0045, 0.0032, 0.0024], toes: 5, toeLen: 0.017, toeSpread: 120, toeLens: [0.45, 0.7, 0.9, 1.15, 0.6], fanUp: 0.6 },
+    fore: { type: 'sprawl', l1: 0.022, l2: 0.023, l3: 0.004, width: 0.008, sprawl: 0.024, lift: 0.012, pole: [-0.3, 1, 0.7], r: [0.0052, 0.0036, 0.0026, 0.002], toes: 5, toeLen: 0.009, toeSpread: 120, toeLens: [0.5, 0.8, 1, 0.9, 0.6], fanUp: 0.6 },
     head: lizardHead,
     extras(r, { sp }) {
-      // dorsal crest: a row of small spines from the nape down the tail base
-      for (let i = 8; i < sp.length - 1; i++) {
-        const s = sp[i], n = sp[i + 1];
-        const h = s.r * (0.7 + 0.25 * Math.sin(i * 1.7));
-        r.cone(add(s.p, [0, s.r * 0.8, 0]), add(mixv(s.p, n.p, 0.5), [-0.004, s.r + h * 0.55, 0]), s.r * 0.22, 0.0003, { kind: 3, k: 0.001 });
-      }
-      for (let i = 3; i < 8; i++) {
-        const s = sp[i];
-        r.cone(add(s.p, [0, s.r * 0.8, 0]), add(s.p, [-0.003, s.r + 0.0035, 0]), s.r * 0.2, 0.0003, { kind: 3, k: 0.001 });
+      // a fine scale fringe along the back and the tail base: many small, low, backward-leaning scales
+      for (let i = 2; i < sp.length - 3; i++) for (let j = 0; j < 4; j++) {
+        const f = j / 4, p = mixv(sp[i].p, sp[i + 1].p, f), rr = mix(sp[i].r, sp[i + 1].r, f);
+        const h = rr * (0.18 + 0.07 * Math.sin(i * 2.3 + j * 1.7));
+        r.cone(add(p, [0, rr * 0.9, 0]), add(p, [-rr * 0.4, rr + h, 0]), rr * 0.1, 0.00012, { kind: 3, k: 0.0003 });
       }
     },
     frameH: 0.075, frameL: 0.45, center: [-0.04, 0.035],
   },
   // 4 · theropod (Coelophysis-like, 3 m, hip 1 m): biped walk, duty 0.6, Fr ≈ 0.3, horizontal
-  // back see-sawing on the hips, S-neck, stabilised head, stiff tail with small yaw
+  // back see-sawing on the hips; drawn with smooth spline outlines: an S-curved neck, a deep chest,
+  // a drumstick thigh flowing into a bowed shank, three clawed toes, small clawed hands, a tail that
+  // tapers along a gentle curve, a serrated jaw line and a fine feathery fringe down the back
   theropod: {
-    scale: 2.5, T: 0.93, duty: 0.6, v: 1.7, offs: { LH: 0, RH: 0.5 },
-    hp: 1.0, shH: 0.97, shX: 0.62, trunkR: [0.19, 0.22, 0.17], bellySag: 0.06, bob: 0.03, bobPh: 0.3, pitchOsc: 0.015,
-    neck: { len: 0.5, deg: 52, r0: 0.11, r1: 0.065 }, headNod: 3,
-    tail: { len: 1.55, r0: 0.17, r1: 0.01, deg: 3, droop: 0.1, wave: 0.12, lag: 0.3 },
-    hind: { type: 'digitigrade', l1: 0.42, l2: 0.46, l3: 0.30, metaDeg: 62, width: 0.1, sprawl: 0.0, lift: 0.16, pole: [1, 0, 0.1], rootY: -0.02, r: [0.17, 0.085, 0.045, 0.034], toes: 3, toeLen: 0.15, toeSpread: 50, toeLens: [0.8, 1.1, 0.85], k: 0.05 },
-    head(r, { neckTop, neckDir, cyc }) {
-      const d = nrm([1, -0.12 + 0.03 * Math.sin(TAU * 2 * cyc), 0]);
-      const tip = add(neckTop, d, 0.3);
-      r.cone(add(neckTop, [-0.03, 0.0, 0]), tip, 0.072, 0.022, { k: 0.03 });
-      r.cone(add(neckTop, [0.0, -0.04, 0]), add(tip, [-0.02, -0.026, 0]), 0.045, 0.014, { k: 0.015 });
-      const eye = add(add(neckTop, d, 0.085), [0, 0.022, 0]);
-      // jaw line with a row of tiny teeth (cut-paper serration)
-      const j0 = add(add(neckTop, d, 0.1), [0, -0.024, 0.06]), j1 = add(tip, [-0.015, -0.016, 0.06]);
-      r.cone(j0, j1, 0.0035, 0.0025, { kind: 5 });
-      for (let i = 0; i < 7; i++) { const p = mixv(j0, j1, (i + 0.5) / 7); r.cone(add(p, [0, 0.004, 0]), add(p, [0.004, -0.004, 0]), 0.003, 0.0008, { k: 0.002 }); }
+    scale: 2.5, T: 0.93, duty: 0.6, v: 1.7, offs: { LH: 0, RH: 0.5 }, noCuts: 1, spineS: 36,
+    hp: 1.0, shH: 0.97, shX: 0.62, trunkR: [0.18, 0.235, 0.26, 0.17], bellySag: 0.1, bob: 0.03, bobPh: 0.3, pitchOsc: 0.015, bodyK: 0.06,
+    neck: { len: 0.56, deg: 60, r0: 0.125, r1: 0.068, s: 0.055 }, headNod: 3,
+    tail: { len: 1.66, r0: 0.19, r1: 0.006, deg: 9, droop: 0.36, curl: 0.13, wave: 0.1, lag: 0.3, n: 8, pow: 1.45 },
+    hind: { type: 'digitigrade', l1: 0.42, l2: 0.46, l3: 0.30, metaDeg: 62, width: 0.1, sprawl: 0.0, lift: 0.16, pole: [1, 0, 0.1], rootY: -0.02,
+      r: [0.15, 0.078, 0.042, 0.032], toes: 3, toeLen: 0.16, toeSpread: 50, toeLens: [0.8, 1.1, 0.85], k: 0.055,
+      thighMass: [0.19, 0.115], calfMass: [0.075, 0.038], bow: 0.028, claw: 0.055 },
+    head(r, { neckTop, cyc, call = 0 }) {
+      const d = nrm(rotZ([1, -0.16 + 0.03 * Math.sin(TAU * 2 * cyc) * (1 - call), 0], 0.2 * call));
+      const up = [-d[1], d[0], 0];
+      const Ls = 0.34;
+      const Pt = (u, h) => add(add(neckTop, d, u * Ls - 0.02), up, h);
+      // skull: (u along the skull, centre height, radius): deep behind the eye, a long tapering snout
+      const prof = [[0.0, 0.018, 0.068], [0.2, 0.03, 0.064], [0.42, 0.024, 0.05], [0.66, 0.012, 0.037], [0.88, 0.002, 0.027], [1.0, -0.002, 0.021]];
+      const ph = (u) => { for (let i = 0; i < prof.length - 1; i++) if (u <= prof[i + 1][0]) { const f = (u - prof[i][0]) / (prof[i + 1][0] - prof[i][0]); return [mix(prof[i][1], prof[i + 1][1], f), mix(prof[i][2], prof[i + 1][2], f)]; } return [prof[5][1], prof[5][2]]; };
+      for (let i = 0; i < prof.length - 1; i++) r.cone(Pt(prof[i][0], prof[i][1]), Pt(prof[i + 1][0], prof[i + 1][1]), prof[i][2], prof[i + 1][2], { k: 0.012 });
+      r.cone(Pt(0.985, 0.0), Pt(1.03, -0.006), 0.021, 0.016, { k: 0.008 });                                  // rounded snout tip
+      r.cone(Pt(0.26, 0.078), Pt(0.36, 0.08), 0.02, 0.016, { k: 0.01 });                                     // brow over the eye
+      r.cone(Pt(0.72, 0.043), Pt(0.8, 0.04), 0.009, 0.006, { k: 0.008 });                                     // nasal ridge
+      // lower jaw: hinged at the back; closed, a thin gap runs along the jaw line and the teeth cross it
+      const gap = 0.008, hinge = Pt(0.05, -0.06), jaw = [];
+      for (const u of [0.05, 0.3, 0.6, 0.97]) {
+        const [hc, rc] = ph(u), rj = mix(0.04, 0.015, (u - 0.05) / 0.92);
+        const top = u < 0.2 ? hc - rc + 0.012 : hc - rc - gap;
+        jaw.push({ p: Pt(u, top - rj), r: rj });
+      }
+      const open = -0.62 * call;
+      const J = (p) => rotAbout(hinge, p, open);
+      for (let i = 0; i < jaw.length - 1; i++) r.cone(J(jaw[i].p), J(jaw[i + 1].p), jaw[i].r, jaw[i + 1].r, { k: 0.006 });
+      r.cone(J(add(jaw[0].p, up, -0.012)), J(add(jaw[1].p, up, -0.02)), 0.034, 0.024, { k: 0.01 });          // throat
+      // teeth: a serrated edge along both jaws (curved, pointing back a little)
+      for (let i = 0; i < 12; i++) {
+        const u = 0.3 + i * 0.058, [hc, rc] = ph(u);
+        const base = Pt(u, hc - rc + 0.004), tip = add(add(base, up, -0.017 - 0.004 * ((i * 7) % 3)), d, -0.004);
+        r.cone(base, tip, 0.0048, 0.0006, { k: 0 });
+      }
+      for (let i = 0; i < 10; i++) {
+        const u = 0.34 + i * 0.062;
+        const f = (u - 0.05) / 0.92, rj = mix(0.04, 0.015, f);
+        const [hc, rc] = ph(u), top = hc - rc - gap;
+        const base = J(Pt(u, top - 0.003)), tip = J(add(add(Pt(u, top - 0.003), up, 0.013), d, -0.003));
+        r.cone(base, tip, 0.004, 0.0006, { k: 0 });
+      }
     },
-    extras(r, { sh, cyc, sp }) {
+    extras(r, { sh, pel, cyc, sp }) {
+      // deep chest: the ribcage drops below the shoulder line, the belly lifts toward the pelvis
+      r.cone(add(sh, [0.03, -0.12, 0]), add(sh, [-0.22, -0.13, 0]), 0.14, 0.15, { k: 0.09 });
       // small held arms with three clawed fingers, hardly swinging
       for (const side of [1, -1]) {
         const far = side < 0 ? 1 : 0;
         r.group = side > 0 ? 'LF' : 'RF';
-        const s0 = add(sh, [0.02, -0.08, 0.1 * side]);
+        const s0 = add(sh, [0.03, -0.1, 0.1 * side]);
         const sw = 0.1 * Math.sin(TAU * (cyc + (side > 0 ? 0 : 0.5)));
-        const el = add(s0, rotZ([0.02, -0.17, 0], sw));
-        const wr = add(el, rotZ([0.13, -0.03, 0], sw * 0.5));
-        r.cone(s0, el, 0.04, 0.025, { k: 0.02, far });
-        r.cone(el, wr, 0.025, 0.017, { k: 0.01, far });
-        digits(r, wr, [0.5, 0, 0], 3, 0.07, 0.011, 40, 1.3, { k: 0.004, far }, [0.8, 1, 0.9]);
+        const el = add(s0, rotZ([0.0, -0.17, 0], sw));
+        const wr = add(el, rotZ([0.14, -0.02, 0], sw * 0.5));
+        r.cone(s0, el, 0.042, 0.026, { k: 0.025, far });
+        r.cone(add(s0, [0.0, -0.03, 0]), mixv(s0, el, 0.6), 0.046, 0.03, { k: 0.03, far });                      // upper-arm muscle
+        r.cone(el, wr, 0.026, 0.016, { k: 0.012, far });
+        digits(r, wr, [0.6, -0.3, 0], 3, 0.07, 0.01, 44, 1.3, { k: 0.004, far, claw: 0.03 }, [0.75, 1, 0.9]);
       }
       r.group = 'x';
-      // faint dorsal scute line along the back
-      for (let i = 5; i < 12; i++) { const s = sp[i]; r.cone(add(s.p, [0, s.r * 0.85, 0]), add(s.p, [-0.03, s.r + 0.012, 0]), 0.012, 0.002, { kind: 3, k: 0.004 }); }
+      // a fine fringe of filaments down the back and the upper tail (early theropods carried
+      // protofeathers): short, dark, backswept strands along the dorsal line
+      const n = sp.length;
+      for (let i = Math.round(n * 0.3); i < n - 4; i++) for (let j = 0; j < 2; j++) {
+        const f = j / 2, a = sp[i], b = sp[i + 1];
+        const p = mixv(a.p, b.p, f), rr = mix(a.r, b.r, f);
+        const tg = nrm(sub(b.p, a.p)), up = [-tg[1], tg[0], 0];
+        const ln = (0.05 + 0.03 * Math.abs(Math.sin(i * 2.1 + j * 1.3))) * (i > n * 0.8 ? 0.7 : 1);
+        const base = add(p, up, rr * 0.95), tip = add(add(base, up, ln * 0.75), tg, -ln * 0.66);
+        r.cone(base, tip, 0.006, 0.0007, { k: 0 });
+      }
     },
     frameH: 1.75, frameL: 3.1, center: [-0.1, 0.85],
   },
@@ -445,13 +578,13 @@ const DEFS = {
     tail: { len: 0.42, r0: 0.03, r1: 0.022, deg: -20, droop: 0.35, curl: 0.03, wave: 0.03, lag: 0.35, vwave: 0.4 },
     hind: { type: 'digitigrade', l1: 0.16, l2: 0.17, l3: 0.105, metaDeg: 70, width: 0.045, lift: 0.07, pole: [1, 0, 0], rootY: -0.01, r: [0.05, 0.028, 0.017, 0.014], paw: 0.04 },
     fore: { type: 'digitigrade', l1: 0.14, l2: 0.15, l3: 0.05, metaDeg: 76, metaBack: 0.35, width: 0.045, lift: 0.08, pole: [-1, 0, 0], rootX: 0.01, rootY: -0.04, r: [0.042, 0.024, 0.016, 0.013], paw: 0.035, neutral: 0.02 },
-    head(r, { neckTop, neckDir, cyc }) {
-      const d = nrm([1, -0.35, 0]);
+    head(r, { neckTop, neckDir, cyc, call = 0 }) {
+      const d = nrm(rotZ([1, -0.35, 0], 0.35 * call));
       const cr = add(neckTop, [0.02, 0.012, 0]);
       const tip = add(cr, d, 0.14);
       r.cone(add(cr, [-0.02, 0.005, 0]), add(cr, [0.03, -0.002, 0]), 0.05, 0.046, { k: 0.02, kind: 2 });
       r.cone(add(cr, [0.02, -0.005, 0]), tip, 0.04, 0.011, { k: 0.02, kind: 2 });
-      r.cone(add(cr, [0.02, -0.03, 0]), add(tip, [-0.03, -0.012, 0]), 0.022, 0.008, { k: 0.01 });
+      r.cone(add(cr, [0.02, -0.03, 0]), rotAbout(add(cr, [0.02, -0.03, 0]), add(tip, [-0.03, -0.012, 0]), -0.4 * call), 0.022, 0.008, { k: 0.01 });
       r.cone(tip, add(tip, [0.004, -0.002, 0]), 0.011, 0.01, { k: 0.004 });                      // nose
       const eye = add(add(cr, d, 0.045), [0, 0.022, 0]);
       // ears: tall, thin, pointed, glowing when backlit; a small flick now and then
@@ -485,13 +618,13 @@ const DEFS = {
     tail: { len: 0.06, r0: 0.08, r1: 0.05, deg: -60 },
     hind: { type: 'plantigrade', l1: 0.28, l2: 0.26, l3: 0.06, foot: 0.19, width: 0.09, lift: 0.07, pole: [1, 0.1, 0.5], rootY: -0.04, r: [0.08, 0.052, 0.036, 0.034], calf: [0.05, 0.035], thigh: [0.075, 0.055], bigToe: 0.07, neutral: -0.02, k: 0.03 },
     fore: { type: 'knuckle', l1: 0.3, l2: 0.29, l3: 0.1, width: 0.12, lift: 0.08, pole: [-1, 0, 0.4], rootY: -0.05, r: [0.06, 0.045, 0.032, 0.03], neutral: 0.06 },
-    head(r, { neckTop }) {
-      const c = add(neckTop, [0.05, 0.035, 0]);
+    head(r, { neckTop, call = 0 }) {
+      const c = add(neckTop, [0.05, 0.035 + 0.02 * call, 0]);
       r.cone(add(c, [-0.03, 0.01, 0]), add(c, [0.03, 0.005, 0]), 0.085, 0.078, { k: 0.02, kind: 2 });            // cranium
       r.cone(add(c, [0.07, 0.03, 0]), add(c, [0.095, 0.026, 0]), 0.03, 0.028, { k: 0.02 });                       // brow ridge
       r.cone(add(c, [0.07, -0.015, 0]), add(c, [0.14, -0.05, 0]), 0.055, 0.042, { k: 0.03 });                     // prognathic muzzle
-      r.cone(add(c, [0.06, -0.07, 0]), add(c, [0.13, -0.078, 0]), 0.03, 0.026, { k: 0.02 });                      // lower lip / jaw
-      r.cone(add(c, [0.14, -0.04, 0]), add(c, [0.155, -0.058, 0]), 0.022, 0.02, { k: 0.015 });                    // upper lip
+      r.cone(add(c, [0.06, -0.07, 0]), rotAbout(add(c, [0.06, -0.07, 0]), add(c, [0.13 + 0.02 * call, -0.078, 0]), -0.25 * call), 0.03, 0.026, { k: 0.02 });  // lower lip / jaw
+      r.cone(add(c, [0.14, -0.04, 0]), add(c, [0.155 + 0.035 * call, -0.058 - 0.012 * call, 0]), 0.022, 0.02 + 0.006 * call, { k: 0.015 });                   // upper lip (pouts)
       for (const [dz, far] of [[0.075, 0], [-0.075, 1]]) {                                                        // big round ears
         const e = add(c, [-0.01, 0.0, dz]);
         r.cone(e, add(e, [-0.02, 0.025, 0.01 * Math.sign(dz)]), 0.036, 0.03, { kind: 6, thick: 0.0045, k: 0.004, far });
@@ -520,33 +653,39 @@ const DEFS = {
       r.cone(add(c, [-0.005, -0.02, 0.07]), add(c, [-0.01, -0.045, 0.07]), 0.016, 0.012, { kind: 6, thick: 0.003, k: 0.006 }); // ear
       r.cone(add(c, [-0.07, 0.01, 0]), add(c, [0.03, 0.045, 0]), 0.07, 0.062, { k: 0.025, kind: 2 });             // hair
     },
-    extras(r, { sh, pel, cyc }) {
+    extras(r, { sh, pel, cyc, P }) {
       // torso masses: buttocks, lower back curve, rib cage, shoulder (deltoid)
       r.cone(add(pel, [-0.035, -0.01, 0]), add(pel, [-0.045, -0.07, 0]), 0.1, 0.09, { k: 0.05 });
       r.cone(add(pel, [0.02, 0.12, 0]), add(pel, [0.035, 0.26, 0]), 0.1, 0.112, { k: 0.06 });
       r.cone(add(sh, [0.02, -0.26, 0]), add(sh, [0.02, -0.1, 0]), 0.122, 0.12, { k: 0.06 });
       r.cone(add(sh, [0.0, -0.02, 0.15]), add(sh, [0.02, -0.1, 0.17]), 0.056, 0.05, { k: 0.04 });
-      // near (left) arm holds the torch high & forward; far (right) arm swings opposite its leg
+      // near (left) arm carries the unlit torch low and forward; P.raise lifts it to the sky
+      // (shoulder and elbow angles interpolate, so the arm keeps its length). Far (right) arm swings
+      // opposite its leg, relaxing to hang when the walker stops (P.armRelax).
       const S = add(sh, [0.0, -0.035, 0.17]), Sf = add(sh, [0.0, -0.035, -0.17]);
+      const rz = P.raise || 0, re = rz * rz * (3 - 2 * rz);
       r.group = 'LF';
-      const lift = 0.01 * Math.sin(TAU * 2 * cyc);
-      const el = add(S, [0.1, -0.24 + lift, 0.03]);
-      const hand = add(el, [0.22, 0.1 + lift, 0.0]);
+      const lift = 0.01 * Math.sin(TAU * 2 * cyc) * (1 - re);
+      const a1 = (-80 + 90 * re) * Math.PI / 180, a2 = (-15 + 55 * re) * Math.PI / 180, at = (35 + 35 * re) * Math.PI / 180;
+      const el = add(S, [0.28 * Math.cos(a1), 0.28 * Math.sin(a1) + lift, 0.03]);
+      const hand = add(el, [0.26 * Math.cos(a2), 0.26 * Math.sin(a2), 0.0]);
       r.cone(S, el, 0.047, 0.036, { k: 0.02 });
-      r.cone(add(S, [0.0, -0.06, 0]), add(S, [0.02, -0.16, 0]), 0.05, 0.04, { k: 0.03 });                          // biceps/deltoid mass
+      r.cone(add(S, [0.0, -0.03, 0]), mixv(S, el, 0.55), 0.05, 0.04, { k: 0.03 });                                  // biceps/deltoid mass
       r.cone(el, hand, 0.037, 0.027, { k: 0.02 });
-      r.cone(add(el, [0.03, 0.0, 0]), add(el, [0.12, 0.045, 0]), 0.04, 0.032, { k: 0.02 });                       // forearm muscle
-      r.cone(add(hand, [-0.015, -0.005, 0]), add(hand, [0.035, 0.005, 0]), 0.036, 0.03, { k: 0.012 });             // fist
-      r.cone(add(hand, [0.0, 0.012, 0.01]), add(hand, [0.03, 0.03, 0.01]), 0.014, 0.012, { k: 0.006 });           // thumb over the shaft
-      // torch: a stout branch angled up and forward, a burning bundle at the top
+      r.cone(mixv(el, hand, 0.12), mixv(el, hand, 0.5), 0.04, 0.032, { k: 0.02 });                                 // forearm muscle
+      const td = [Math.cos(at), Math.sin(at), 0];
+      r.cone(add(hand, td, -0.03), add(hand, td, 0.03), 0.036, 0.03, { k: 0.012 });                                // fist
+      r.cone(add(hand, [0.0, 0.012, 0.01]), add(add(hand, td, 0.03), [0.0, 0.03, 0.01]), 0.014, 0.012, { k: 0.006 }); // thumb over the shaft
+      // torch: a stout branch, a bundle of dry grass bound at its head
       r.group = 'torch';
-      const t0 = add(hand, [-0.1, -0.2, 0.02]), t1 = add(hand, [0.13, 0.45, 0.02]);
+      const t0 = add(hand, td, -0.2), t1 = add(hand, td, 0.42);
       r.cone(t0, t1, 0.017, 0.024, { kind: 4, k: 0.0 });
-      r.cone(add(t1, [-0.025, -0.07, 0]), add(t1, [0.008, 0.02, 0]), 0.038, 0.034, { kind: 4, k: 0.012 });
-      r.cone(add(t1, [-0.03, -0.02, 0]), add(t1, [-0.05, 0.03, 0]), 0.01, 0.004, { kind: 4, k: 0.004 });          // frayed twigs
-      r.cone(add(t1, [0.02, -0.01, 0]), add(t1, [0.045, 0.035, 0]), 0.009, 0.003, { kind: 4, k: 0.004 });
+      r.cone(add(t1, td, -0.07), add(t1, td, 0.02), 0.038, 0.034, { kind: 4, k: 0.012 });
+      r.cone(add(t1, [-0.03, -0.01, 0]), add(t1, [-0.05, 0.03, 0]), 0.01, 0.004, { kind: 4, k: 0.004 });          // frayed twigs
+      r.cone(add(t1, [0.02, 0.0, 0]), add(t1, [0.045, 0.035, 0]), 0.009, 0.003, { kind: 4, k: 0.004 });
+      r.flame = add(add(t1, td, 0.05), [0.0, 0.03, 0.02]);
       r.group = 'RF';
-      const sw = 0.36 * Math.sin(TAU * cyc);
+      const sw = 0.36 * Math.sin(TAU * cyc) * (1 - (P.armRelax || 0));
       const elf = add(Sf, rotZ([0, -0.3, 0], sw));
       const hf = add(elf, rotZ([0, -0.25, 0], sw * 1.35 + 0.22));
       r.cone(Sf, elf, 0.046, 0.035, { k: 0.02, far: 1 });
@@ -559,20 +698,14 @@ const DEFS = {
 };
 
 /** Pose any stage at time t (seconds, local to the stage). Returns { prims, meta }. */
-export function poseCreature(key, t) {
+export function poseCreature(key, t, ov = {}) {
   let out;
-  if (key === 'tiktaalik') out = tiktaalik(t);
-  else out = quadruped(t, DEFS[key]);
+  if (key === 'tiktaalik') out = tiktaalik(t, ov);
+  else out = quadruped(t, { ...DEFS[key], ...ov, offs: { ...DEFS[key].offs, ...(ov.offs || {}) } });
   const def = DEFS[key];
   let flame = null;
-  if (key === 'human') {
-    // re-run the extras hook to get the flame anchor (it returned it from the builder)
-    const r = out.rig.p;
-    const torch = r.filter(p => p.kind === 4);
-    const top = torch[torch.length - 1];
-    flame = add(top.b, [0.01, 0.06, 0]);
-  }
-  return { prims: out.rig.p, X: out.X, height: out.height, len: out.len, center: out.center, water: out.water || 0, flame, G: out.G, key, label: STAGE_LABEL[key] };
+  if (key === 'human') flame = out.rig.flame;
+  return { prims: out.rig.p, X: out.X, height: out.height, len: out.len, center: out.center, water: out.water || 0, flame, G: out.G, key, label: STAGE_LABEL[key], feet: out.feet || [] };
 }
 
 /**
@@ -585,13 +718,17 @@ export function morphCreatures(A, B, w) {
   const W = (C, v) => [v[0] * C.k + C.world[0], v[1] * C.k + C.world[1], v[2] * C.k + C.world[2]];
   const toR = (v) => [v[0] / km, v[1] / km, v[2] / km];
   const mapB = new Map(B.pose.prims.map(p => [p.slot, p]));
+  const spA = A.pose.prims.filter(p => p.slot.startsWith('spine:')), spB = B.pose.prims.filter(p => p.slot.startsWith('spine:'));
+  if (spA.length && spB.length && spA.length !== spB.length) {
+    spA.forEach((p, j) => mapB.set(p.slot, spB[Math.round(j * (spB.length - 1) / Math.max(1, spA.length - 1))]));
+  }
   const used = new Set(), out = [];
   const e = w * w * (3 - 2 * w);
   for (const pa of A.pose.prims) {
     const pb = mapB.get(pa.slot);
     const a0 = W(A, pa.a), b0 = W(A, pa.b);
     if (pb) {
-      used.add(pa.slot);
+      used.add(pb.slot);
       const a1 = W(B, pb.a), b1 = W(B, pb.b);
       out.push({ a: toR(mixv(a0, a1, e)), b: toR(mixv(b0, b1, e)), ra: mix(pa.ra * A.k, pb.ra * B.k, e) / km, rb: mix(pa.rb * A.k, pb.rb * B.k, e) / km,
         k: mix(pa.k * A.k, pb.k * B.k, e) / km, kind: e < 0.5 ? pa.kind : pb.kind, thick: mix(pa.thick, pb.thick, e), far: pa.far, slot: pa.slot,

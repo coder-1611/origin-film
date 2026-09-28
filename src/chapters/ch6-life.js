@@ -1,16 +1,23 @@
-// VI · LIFE (106–134 s, bars 41–54). One continuous shot, three simulations:
-//   Gray-Scott reaction-diffusion (cells on a stromatolite) → L-system forest on the shore
-//   (over-under at the waterline) → boids (fish school → breach → birds → murmuration at sunset).
-// Every stateful sim replays deterministically from the window start (see ch6/rd.js, ch6/boids.js).
+// VI · LIFE (106–154 s, bars 41–64). One continuous shot:
+//   Gray-Scott reaction-diffusion (cells on a stromatolite) → a space-colonization forest sprouting
+//   on the shore (over-under at the waterline) → boids (fish school → breach → birds → a murmuration)
+//   → the march: a silhouette walker evolving tetrapod → human on wet sand before the setting sun,
+//   feet planting on every footstep; the human raises a torch whose flame takes the sun's last
+//   glint at the exact centre and becomes the ember of chapter VII.
+// Every stateful sim replays deterministically from the window start (see ch6/rd.js, ch6/boids.js);
+// everything else is a pure function of t.
 import { THREE } from '../engine/gl.js';
-import { makeGlobals, WATER_MAG } from './ch6/common.js';
+import { makeGlobals, WATER_MAG, GL_UNIFORMS, GL_SKY } from './ch6/common.js';
 import { makeNoiseTexture, makeCaustics } from './ch6/textures.js';
 import { makeGrayScott } from './ch6/rd.js';
 import { makeTerrainGeometry } from './ch6/terrain.js';
 import { makeStromatolites, makeKelp } from './ch6/world.js';
 import { makeWaterView } from './ch6/water.js';
 import { makeAirView } from './ch6/air.js';
-import { buildForest, planFlushes, makeForestMeshes } from './ch6/forest.js';
+import { makeGrove } from './ch6/grove.js';
+import { makeMarch } from './ch6/march.js';
+import { MARCH_FRAME } from './ch6/camera.js';
+import { makeCreatureRenderer } from './ch6/lab/creature-render.js';
 import { makeBoids, TB0 } from './ch6/boids.js';
 import { makeCreatures } from './ch6/creatures.js';
 import { makeShadowUniforms, makeSunShadow } from './ch6/shadow.js';
@@ -18,7 +25,7 @@ import * as L from './ch6/layout.js';
 import { makeFlockGoal } from './ch6/flock.js';
 
 const { DEG } = L;
-let shadow, boids, cre, forest, fm, G, noise, caus, rd, water, air, comp, camAir, camWater, camBase, T, wOut, aOut;
+let marchSwitchT = 122, shadow, boids, cre, grove, march, walkR, walkFrame, mOut, G, noise, caus, rd, water, air, comp, camAir, camWater, camBase, T, wOut, aOut;
 const SS = 2;                  // supersampling of the internal views (downsampled in the composite)
 const RD_PORT = 0.12;          // dome-port radius (m): where the waterline crosses the lens
 
@@ -80,15 +87,17 @@ function buildRDEvents(ctx) {
 
 // ---------------------------------------------------------------- per-t light
 // Palette keyframes (linear): golden afternoon → low sun → sunset → dusk.
+// (times are set in init from the timeline: forest, breach, march, torch, the chapter's end)
 const PAL = {
-  t:    [114, 122, 126, 129, 131, 132.8, 134.3],
-  zen:  [[0.02, 0.07, 0.26], [0.02, 0.065, 0.23], [0.028, 0.06, 0.19], [0.02, 0.038, 0.12], [0.014, 0.022, 0.07], [0.009, 0.012, 0.035], [0.004, 0.004, 0.005]],
-  mid:  [[0.16, 0.28, 0.50], [0.19, 0.27, 0.44], [0.26, 0.25, 0.34], [0.26, 0.17, 0.23], [0.24, 0.10, 0.12], [0.16, 0.055, 0.06], [0.012, 0.006, 0.005]],
-  hor:  [[0.86, 0.66, 0.44], [0.92, 0.62, 0.38], [0.92, 0.55, 0.30], [1.0, 0.45, 0.18], [0.95, 0.34, 0.10], [0.72, 0.22, 0.05], [0.03, 0.012, 0.004]],
-  hor2: [[0.34, 0.42, 0.55], [0.36, 0.40, 0.48], [0.38, 0.34, 0.40], [0.32, 0.23, 0.30], [0.20, 0.12, 0.19], [0.10, 0.055, 0.09], [0.008, 0.005, 0.005]],
-  sun:  [[3.4, 2.9, 2.2], [3.3, 2.65, 1.9], [3.1, 2.15, 1.3], [2.8, 1.55, 0.72], [2.4, 1.0, 0.30], [2.0, 0.70, 0.17], [1.2, 0.4, 0.1]],
-  disk: [16, 16, 14, 12, 10, 9, 8],
+  t:    [114, 120, 125, 129, 135, 145, 151.2, 154.4],
+  zen:  [[0.02, 0.065, 0.22], [0.02, 0.055, 0.19], [0.018, 0.045, 0.15], [0.015, 0.035, 0.12], [0.012, 0.025, 0.085], [0.009, 0.016, 0.05], [0.005, 0.007, 0.018], [0.003, 0.003, 0.004]],
+  mid:  [[0.18, 0.26, 0.44], [0.22, 0.24, 0.38], [0.26, 0.22, 0.30], [0.28, 0.17, 0.22], [0.26, 0.12, 0.15], [0.19, 0.075, 0.08], [0.06, 0.022, 0.022], [0.008, 0.004, 0.003]],
+  hor:  [[0.95, 0.68, 0.42], [1.0, 0.60, 0.33], [1.05, 0.52, 0.24], [1.05, 0.45, 0.16], [0.98, 0.37, 0.11], [0.8, 0.26, 0.07], [0.28, 0.08, 0.025], [0.02, 0.008, 0.003]],
+  hor2: [[0.36, 0.40, 0.50], [0.36, 0.34, 0.42], [0.33, 0.26, 0.34], [0.28, 0.19, 0.27], [0.22, 0.13, 0.20], [0.13, 0.07, 0.11], [0.04, 0.022, 0.03], [0.006, 0.004, 0.004]],
+  sun:  [[3.2, 2.4, 1.5], [3.0, 2.05, 1.15], [2.8, 1.7, 0.8], [2.6, 1.25, 0.45], [2.4, 0.95, 0.28], [2.1, 0.72, 0.18], [1.2, 0.4, 0.1], [1.0, 0.3, 0.08]],
+  disk: [14, 13, 12, 11, 10, 9, 8, 8],
 };
+let TK = null;     // key times from the timeline (set in init)
 function palAt(key, t) {
   const ts = PAL.t, v = PAL[key];
   if (t <= ts[0]) return v[0];
@@ -116,10 +125,11 @@ function updateGlobals(t) {
   G.uSkyHor2.value.set(...palAt('hor2', t));
   G.uSkyMid.value.set(...palAt('mid', t));
   G.uSunDisk.value = palAt('disk', t);
-  G.uDusk.value = T.smootherstep(133.1, 134.7, t) * 0.97;
+  G.uDusk.value = T.smootherstep(TK.torch + 0.3, TK.end - 0.4, t) * 0.97;
+  G.uGlint.value = T.smootherstep(TK.torch - 0.45, TK.torch - 0.08, t) * (1 - T.smootherstep(TK.torch - 0.015, TK.torch + 0.02, t));
   G.uUnder.value.set(0.02, 0.10, 0.11);
-  G.uWaterLight.value = 1 - 0.22 * T.smootherstep(112.5, 115, t) - 0.18 * T.smootherstep(118, 126, t);
-  G.uGreen.value = T.smootherstep(113.6, 121.5, t);
+  G.uWaterLight.value = 1 - 0.22 * T.smootherstep(112.5, 115, t) - 0.12 * T.smootherstep(118, TK.breach - 1, t);
+  G.uGreen.value = T.smootherstep(113.6, TK.forestEnd - 0.5, t);
   // kick envelope
   let kk = 0;
   for (const kt of T.kicks) { if (kt > t) break; if (t - kt < 0.6) kk = Math.max(kk, Math.exp(-(t - kt) / 0.14)); }
@@ -200,8 +210,8 @@ function makeComposite(ctx) {
       vec3 c = mix(Wc, A, m);
       // meniscus: a dark refracting line with a bright lip catching the sky just above it;
       // brighter while the surface slides over the lens
-      float dark = exp(-pow(s / (px * 3.2), 2.0));
-      float lip = exp(-pow((s - px * 3.5) / (px * (1.4 + 3.0 * surf)), 2.0));
+      float dark = exp(-(s / (px * 3.2)) * (s / (px * 3.2)));
+      float lip = exp(-((s - px * 3.5) / (px * (1.4 + 3.0 * surf))) * ((s - px * 3.5) / (px * (1.4 + 3.0 * surf))));
       c = c * (1.0 - 0.8 * dark) + A * lip * (0.9 + 1.4 * surf) + vec3(0.02, 0.03, 0.03) * lip;
       c += A * 0.35 * surf * exp(-abs(s) / (px * 25.0));
       fragColor = vec4(finish(c), 1.0);
@@ -212,8 +222,8 @@ function makeComposite(ctx) {
     render(r, target, u) {
       const pxw = 2 * Math.tan(camBase.fov * DEG / 2) / ctx.H;
       const t = u.t;
-      const ember = T.smootherstep(133.15, 133.6, t);
-      const dusk = T.smootherstep(133.3, 134.9, t) * 0.985;
+      const ember = T.smootherstep(TK.end - 1.8, TK.end - 1.0, t);
+      const dusk = T.smootherstep(TK.end - 1.8, TK.end + 0.6, t) * 0.985;
       // surfacing: the port rises through the surface (≈113.6–114.3), leaving droplets that dry off
       const surf = T.smootherstep(113.72, 113.95, t) * (1 - T.smootherstep(114.2, 114.65, t));
       const drops = T.smootherstep(113.9, 114.1, t) * (1 - T.smootherstep(114.6, 115.8, t));
@@ -222,11 +232,35 @@ function makeComposite(ctx) {
   };
 }
 
+// ---------------------------------------------------------------- the march
+// The silhouette walker, the wet sand and the sea below the horizon (lab renderer, walk-local
+// frame), over this chapter's own air view above it (sky, murmuration, far land): one image.
+const SHORE = [-5.0, -1.4, 8.0, -2.4];          // sea where z < mix(8, −2.4, smoothstep(−5, −1.4, x))
+function renderMarch(ctx, t) {
+  const w = march.at(t);
+  let flame = null, gain = 0;
+  const u = t - T.march.torch;
+  if (w.flame && u > -0.02) {
+    // the catch: the glint's light passes straight into a flame that flares, then settles
+    const grow = T.smootherstep(-0.015, 0.05, u);
+    gain = grow * (1 + 1.1 * Math.exp(-Math.max(0, u - 0.03) / 0.16));
+    const size = 0.24 * (0.25 + 0.75 * T.smootherstep(0.0, 0.3, u)) * (0.95 + 0.1 * Math.sin(t * 11.0) * Math.sin(t * 4.3 + 1.0));
+    flame = [w.flame[0], w.flame[1], size];
+  }
+  walkR.render(ctx.renderer, mOut, camAir, {
+    A: w.A, t, H: ctx.H, flame, flameGain: gain, frame: walkFrame, bg: aOut.texture, hybrid: true,
+    shore: SHORE, clip: [march.clipX0, 0.12, 0.25], ripples: march.ripples(t), scroll: 0,
+  });
+}
+
 export default {
   id: 'VI',
 
   async init(ctx) {
     T = ctx.T;
+    TK = { breach: T.BREACH_T, march: T.march.t0, stand: T.march.standAt, torch: T.march.torch, end: T.chapterById.VI.end,
+      forestEnd: T.leafFlushes[T.leafFlushes.length - 1].t + 0.25 };
+    PAL.t = [114, 120, TK.breach - 1, TK.march + 1, TK.march + 7, TK.stand - 5, TK.torch + 0.2, TK.end + 0.4];
     G = { ...makeGlobals(), ...makeShadowUniforms() };
     camBase = new THREE.PerspectiveCamera(50, ctx.aspect, 0.004, 8000);
     camWater = new THREE.PerspectiveCamera(50, ctx.aspect, 0.004, 800);
@@ -244,26 +278,26 @@ export default {
     const IW = ctx.W * SS, IH = ctx.H * SS;
     water = makeWaterView(ctx, G, { stroma, kelpGeo, terrainGeo, W: IW, H: IH });
     air = makeAirView(ctx, G, { terrainGeo, W: IW, H: IH });
-    forest = buildForest(T);
-    const vpm = new THREE.Matrix4();
-    let lastT = null, e = null, cy = 0;
-    forest.plan = planFlushes(T, forest, (t, p) => {
-      if (t !== lastT) { setCameras(ctx, t); vpm.multiplyMatrices(camAir.projectionMatrix, camAir.matrixWorldInverse); e = vpm.elements; cy = camBase.position.y; lastT = t; }
-      const w = e[3] * p[0] + e[7] * p[1] + e[11] * p[2] + e[15];
-      if (w <= 0.05) return { ok: false };
-      const x = (e[0] * p[0] + e[4] * p[1] + e[8] * p[2] + e[12]) / w, y = (e[1] * p[0] + e[5] * p[1] + e[9] * p[2] + e[13]) / w;
-      const d = [p[0] - camBase.position.x, p[1] - cy, p[2] - camBase.position.z];
-      const dy = d[1] / Math.hypot(...d);
-      return { x, y, ok: cy + dy * RD_PORT > 0.01 };
-    });
-    fm = makeForestMeshes(ctx, G, forest);
     boids = makeBoids(T, { n: 420, goal: makeFlockGoal(T) });
     cre = makeCreatures(ctx, G, boids.n);
     water.scene.add(cre.fish);
     air.scene.add(cre.birds, cre.drops);
-    air.scene.add(fm.branches, fm.leaves);
     shadow = makeSunShadow(G);
-    shadow.scene.add(fm.barkDepth, fm.leafDepth);
+    grove = makeGrove(ctx, G, T);
+    grove.addTo(air.scene, shadow.scene);
+    march = makeMarch(T);
+    walkR = makeCreatureRenderer({ mode: 'sil', skyGLSL: GL_UNIFORMS + GL_SKY, uniforms: G });
+    const X = MARCH_FRAME.X, Z = MARCH_FRAME.Z;
+    walkFrame = { rot: new THREE.Matrix3().set(X[0], 0, Z[0], X[1], 1, Z[1], X[2], 0, Z[2]), origin: new THREE.Vector3(...MARCH_FRAME.O) };
+    mOut = ctx.makeTarget(ctx.W, ctx.H);
+    // the march's ground replaces the air view's below the horizon: switch while the camera looks
+    // up at the flock (horizon below the frame by > 1°), i.e. the last such moment before it levels
+    for (let tt = TK.breach + 0.4; tt <= TK.breach + 2.4; tt += 1 / 240) {
+      const k = T.sampleCamera(camKeys(), tt);
+      const d = k.target.map((v, i) => v - k.pos[i]);
+      const pitch = Math.asin(d[1] / Math.hypot(...d)) / DEG;
+      if (pitch - k.fov / 2 > 1.0) marchSwitchT = tt;
+    }
     wOut = ctx.makeTarget(IW, IH);
     aOut = ctx.makeTarget(IW, IH);
     comp = makeComposite(ctx);
@@ -296,7 +330,7 @@ export default {
     if (flockOn) cre.update(boids, boids.ensure(t), t);
     if (needW) {
       let rdTex = null;
-      if (t < 127) rdTex = rd.display(r, t);
+      if (t < TK.breach + 2) rdTex = rd.display(r, t);
       const heroVis = T.smootherstep(107.2, 111.5, t);
       G.uCamPos.value.copy(camWater.position);
       const rayGain = (0.12 + 0.88 * T.smootherstep(107.0, 111.0, t)) * (1 - 0.35 * T.smootherstep(113, 115, t));   // faint through the V→VI hand-off
@@ -309,26 +343,29 @@ export default {
       const focus = macro > 0.5 ? hit : 2.6;
       water.render(r, camWater, wOut, { heroVis, rdTex, rayGain, snow: { box, anchor, focus, aper: 0.0035 + 0.004 * macro, amt: 0.8 + 0.6 * macro } });
     }
+    const marchOn = t >= marchSwitchT;
     if (needA) {
       G.uCamPos.value.copy(camAir.position);
-      fm.barkMat.uniforms.uPx.value = 2 * Math.tan(camAir.fov * DEG / 2) / (ctx.H * SS);
+      grove.update(t, r, camAir);
       shadow.render(r, G.uSunDir.value);
       air.render(r, camAir, aOut);
+      if (marchOn) renderMarch(ctx, t);
     }
-    comp.render(r, target, { wTex: wOut.texture, aTex: aOut.texture, mode: needW && needA ? 0 : (needW ? 1 : 2),
+    comp.render(r, target, { wTex: wOut.texture, aTex: marchOn && needA ? mOut.texture : aOut.texture, mode: needW && needA ? 0 : (needW ? 1 : 2),
       invProj: camBase.projectionMatrixInverse, camWorld: camBase.matrixWorld, camPos: camBase.position, t });
     r.setRenderTarget(null);
   },
 
-  // Post: dreamy macro, crisper daylight over-under, rich warm sunset.
+  // Post: dreamy macro, crisper daylight over-under, restrained bloom while the silhouettes walk
+  // (heavier bloom veils them), a warmer glow once night falls around the flame.
   post(t) {
     const ss = T.smootherstep;
-    const a = ss(111, 114.5, t), b = ss(128.5, 131, t);
-    const mix3 = (x, y, z) => x + (y - x) * a + (z - y) * b;
+    const a = ss(111, 114.5, t), b = ss(TK.breach + 0.5, TK.breach + 1.5, t), c = ss(TK.torch + 0.4, TK.end - 0.6, t);
+    const mix4 = (w, x, y, z) => w + (x - w) * a + (y - x) * b + (z - y) * c;
     return {
-      bloom: mix3(0.72, 0.5, 0.8), threshold: 1.0, knee: 0.6, bloomRadius: 1.0,
-      vignette: mix3(0.42, 0.3, 0.45), grain: mix3(0.032, 0.026, 0.03), ca: 0.0012,
-      saturation: mix3(1.0, 1.05, 1.08),
+      bloom: mix4(0.72, 0.5, 0.5, 0.7), threshold: mix4(1.0, 1.0, 1.15, 1.0), knee: 0.6, bloomRadius: 1.0,
+      vignette: mix4(0.42, 0.3, 0.42, 0.5), grain: mix4(0.032, 0.026, 0.03, 0.03), ca: 0.0012,
+      saturation: mix4(1.0, 1.05, 1.08, 1.05),
     };
   },
 };

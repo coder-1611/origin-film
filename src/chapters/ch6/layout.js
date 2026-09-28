@@ -35,7 +35,10 @@ export function hitHero(ro, rd) {
 export const SUN_AZ = 50 * DEG;
 export const SUN_R = 0.0135;                             // angular radius (rad), matches GL_SKY
 export function sunElev(t, pwl) {
-  return pwl([[105, 26], [114, 17], [122, 11.5], [126, 8.5], [128, 5.2], [130, 2.3], [132, 0.62], [133.0, -0.32], [133.5, -0.80], [134, -1.3], [136, -3]], t) * DEG;
+  // golden afternoon over the sprouting forest → low for the breach → sitting on the horizon for the
+  // march (sinking slowly) → its top limb meets the horizon as the torch catches (151.0)
+  const R = SUN_R / DEG;
+  return pwl([[105, 20], [114, 11], [120, 8.2], [124, 5.6], [126, 4.0], [127.6, 1.25], [138, 0.95], [146, 0.6], [150, 0.05], [151.0, -R], [151.6, -1.4], [157, -3]], t) * DEG;
 }
 export function sunDir(t, pwl) {
   const e = sunElev(t, pwl);

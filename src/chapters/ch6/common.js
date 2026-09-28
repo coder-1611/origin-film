@@ -19,6 +19,7 @@ export function makeGlobals() {
     uSunDisk: { value: 14 },
     uSunVis: { value: 1 },
     uWaterLight: { value: 1 },
+    uGlint: { value: 0 },          // the sun's last glint on the horizon (a point that hands over to the torch)
     uDusk: { value: 0 },            // 0 = afternoon … 1 = full dusk (sky darkening to black)
     uCamPos: { value: new THREE.Vector3() },
     uCaus: { value: null },          // animated caustics (R: sharp, G: soft), repeat-wrapped
@@ -32,7 +33,7 @@ export function makeGlobals() {
 }
 
 export const GL_UNIFORMS = /* glsl */`
-uniform float uT, uDusk, uKick, uGreen, uSunDisk, uSunVis, uWaterLight;
+uniform float uT, uDusk, uKick, uGreen, uSunDisk, uSunVis, uWaterLight, uGlint;
 uniform vec3 uSunDir, uSunW, uSunCol, uSkyZen, uSkyHor, uSkyHor2, uSkyMid, uCamPos, uUnder, uAudio;
 uniform sampler2D uCaus, uNoise;
 `;
@@ -76,14 +77,14 @@ export const GL_SKY = /* glsl */`
 vec3 skyHorizon(vec3 d) {
   vec2 a = normalize(d.xz + 1e-5), b = normalize(uSunDir.xz + 1e-5);
   float az = 0.5 + 0.5 * dot(a, b);
-  return mix(uSkyHor2, uSkyHor, pow(az, 2.2));
+  return mix(uSkyHor2, uSkyHor, pow(max(az, 0.0), 2.2));
 }
 vec3 skyColor(vec3 d, bool withSun) {
   float y = max(d.y, 0.0);
   float mu = dot(d, uSunDir);
   vec3 hor = skyHorizon(d);
   vec2 a2 = normalize(d.xz + 1e-5), b2 = normalize(uSunDir.xz + 1e-5);
-  float toSun = pow(0.5 + 0.5 * dot(a2, b2), 2.0);
+  float toSun = pow(max(0.5 + 0.5 * dot(a2, b2), 0.0), 2.0);
   // zenith → mid belt → bright horizon band (thin and hot toward the sun)
   vec3 mid = mix(mix(uSkyMid, uSkyHor2, 0.45), uSkyMid, toSun);
   vec3 c = mix(uSkyZen, mid, exp(-y * 4.0));
@@ -100,7 +101,7 @@ vec3 skyColor(vec3 d, bool withSun) {
     cl = smoothstep(0.5, 0.78, cl) * smoothstep(0.015, 0.1, d.y) * (1.0 - smoothstep(0.3, 0.6, d.y));
     vec3 lit = hor * 1.1 + uSunCol * uSunVis * 0.35 * pow(m, 4.0);
     vec3 dark = mix(uSkyZen, uSkyHor2, 0.5) * 0.7;
-    vec3 cc = mix(dark, lit, 0.35 + 0.65 * pow(0.5 + 0.5 * mu, 3.0));
+    vec3 cc = mix(dark, lit, 0.35 + 0.65 * pow(max(0.5 + 0.5 * mu, 0.0), 3.0));
     c = mix(c, cc, cl * 0.7);
   }
   if (withSun) {
@@ -109,6 +110,12 @@ vec3 skyColor(vec3 d, bool withSun) {
     float disc = 1.0 - smoothstep(sr * 0.9, sr, ang);
     float limb = sqrt(max(1.0 - (ang / sr) * (ang / sr), 0.0));
     c += disc * normalize(uSunCol + 1e-4) * 1.7 * uSunDisk * (0.55 + 0.45 * limb);
+    if (uGlint > 0.0) {
+      // the last glint: a hot point where the top limb meets the horizon
+      vec3 gd = normalize(vec3(uSunDir.x, 0.0, uSunDir.z));
+      float a = acos(clamp(dot(d, gd), -1.0, 1.0));
+      c += vec3(1.0, 0.5, 0.16) * uGlint * (26.0 * exp(-(a / 0.0016) * (a / 0.0016)) + 1.6 * exp(-a / 0.012));
+    }
   }
   return c * (1.0 - uDusk);
 }

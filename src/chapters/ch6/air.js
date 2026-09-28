@@ -137,6 +137,7 @@ export function makeAirView(ctx, G, { terrainGeo, W = ctx.W, H = ctx.H }) {
       vec3 dir = normalize(mat3(camWorld) * (vv.xyz / vv.w));
       vec4 g = texture(gTex, vUv);
       vec3 col = haze(g.rgb, g.a, dir);
+      float outA = g.a;
       if (dir.y < 0.0) {
         float tp = -uCamPos.y / dir.y;
         if (tp < g.a) {
@@ -161,9 +162,10 @@ export function makeAirView(ctx, G, { terrainGeo, W = ctx.W, H = ctx.H }) {
           float D = exp(-(1.0 - c2) / (c2 * a2)) / (3.14159 * a2 * c2 * c2);
           wc += uSunCol * uSunVis * D * F * 0.012 * (1.0 - uDusk);
           col = haze(wc, tp, dir);
+          outA = -tp;                     // water (the march's hybrid ground replaces it)
         }
       }
-      fragColor = vec4(col, g.a);
+      fragColor = vec4(col, outA);
     }`, { gTex: { value: null }, invProj: { value: new THREE.Matrix4() }, camWorld: { value: new THREE.Matrix4() }, viewProj: { value: new THREE.Matrix4() }, uPxA: { value: 0.001 }, ...G, ...extra });
 
   const vp = new THREE.Matrix4();

@@ -5,7 +5,7 @@
 // the waterline (it keeps that identity: each fish becomes a bird as it breaches).
 import { DEG } from './layout.js';
 
-export const TB0 = 119.6, TB1 = 135.2, HZ = 120;
+export const TB0 = 122.4, TB1 = 155.2, HZ = 120;   // T.BREACH_T − 3.6 … the end of VI's window
 const DT = 1 / HZ;
 
 export function makeBoids(T, { n = 420, goal, seed = 0xB01D } = {}) {
@@ -24,7 +24,7 @@ export function makeBoids(T, { n = 420, goal, seed = 0xB01D } = {}) {
     for (let i = 0; i < n; i++) {
       // a loose shoal entering from the left, deep
       const u = r(), v = r(), w = r();
-      P[i * 3] = g.p[0] - 1.2 - 1.6 * u; P[i * 3 + 1] = -0.95 + 0.5 * v; P[i * 3 + 2] = g.p[2] + (w - 0.5) * 1.0;
+      P[i * 3] = g.p[0] - 0.5 - 1.1 * u; P[i * 3 + 1] = -0.85 + 0.45 * v; P[i * 3 + 2] = g.p[2] + (w - 0.5) * 0.9;
       V[i * 3] = 1.1 + 0.2 * r(); V[i * 3 + 1] = 0; V[i * 3 + 2] = (r() - 0.5) * 0.3;
       air[i] = 0; breachT[i] = 1e9; trait[i] = r();
     }
@@ -107,7 +107,7 @@ export function makeBoids(T, { n = 420, goal, seed = 0xB01D } = {}) {
         const hd = Math.hypot(hx / 0.78, hy / 0.45, hz / 0.70);
         if (hd < 1.25) { const k = (1.25 - hd) * 25; ax += hx * k; ay += hy * k; az += hz * k; }
       } else {
-        ay += 12.0 * Math.max(0, 2.0 - py) * (t > 129 ? 1 : 0.5);   // birds keep clear of the sea
+        ay += 12.0 * Math.max(0, 1.1 - py) * (t > g.b0 + 3 ? 1 : 0.5);   // birds keep clear of the sea
         const wx = -(gp[2] - pz), wz = gp[0] - px, wl = Math.hypot(wx, wz) + 1e-6;
         ax += wx / wl * g.wheel; az += wz / wl * g.wheel;
       }
@@ -133,7 +133,7 @@ export function makeBoids(T, { n = 420, goal, seed = 0xB01D } = {}) {
         breachT[i] = t + DT; breachX[i] = P[i * 3]; breachZ[i] = P[i * 3 + 2];
         breaches.push({ t: t + DT, x: P[i * 3], z: P[i * 3 + 2], vx, vy, vz, i });
         // the leap: out of the water forward and up, toward where the flock is heading
-        const lx = 0.08 + (trait[i] - 0.5) * 0.5, ly = 0.62 + 0.2 * trait[(i * 7) % n], lz = -1.0;
+        const lx = 0.25 + (trait[i] - 0.5) * 0.5, ly = 0.42 + 0.16 * trait[(i * 7) % n], lz = -1.0;
         const ll = Math.hypot(lx, ly, lz), sp0 = 4.6 + 1.2 * trait[(i * 3) % n];
         V[i * 3] = lx / ll * sp0; V[i * 3 + 1] = ly / ll * sp0; V[i * 3 + 2] = lz / ll * sp0;
       }

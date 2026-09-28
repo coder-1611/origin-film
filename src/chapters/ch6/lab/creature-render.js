@@ -19,7 +19,7 @@
 // Output: linear HDR (pre-tonemap), like every ch6 pass. Pure function of the uniforms.
 import * as THREE from '../../../vendor/three.module.js';
 
-export const MAXP = 160;
+export const MAXP = 240;
 
 // A compact sunset sky, used when the caller doesn't inject ch6's GL_SKY. An injected sky chunk must
 // declare the same uniforms (ch6's GL_UNIFORMS does: uSunDir … uCamPos, uT).
@@ -28,7 +28,7 @@ uniform vec3 uSunDir, uSunCol, uSkyZen, uSkyHor, uSkyHor2, uSkyMid, uCamPos; uni
 vec3 skyColor(vec3 d, bool withSun) {
   float y = max(d.y, 0.0), mu = dot(d, uSunDir);
   vec2 a2 = normalize(d.xz + 1e-5), b2 = normalize(uSunDir.xz + 1e-5);
-  float toSun = pow(0.5 + 0.5 * dot(a2, b2), 2.0);
+  float toSun = pow(max(0.5 + 0.5 * dot(a2, b2), 0.0), 2.0);
   vec3 hor = mix(uSkyHor2, uSkyHor, toSun);
   vec3 c = mix(uSkyZen, mix(uSkyMid, uSkyHor2, 0.3), exp(-y * 4.0));
   c = mix(c, hor, exp(-y * 11.0));
@@ -50,6 +50,14 @@ uniform vec4 uBox;                     // creature plane bbox (local xy min/max)
 // the walk's LOCAL frame: creature plane z = 0, ground y = 0; uRot maps local → world directions,
 // uOrigin is the local origin in world space (identity / 0 = world). Optional background texture.
 uniform mat3 uRot; uniform vec3 uOrigin; uniform sampler2D uBg; uniform float uBgOn;
+uniform vec4 uShore;                   // sea where z < mix(shore.z, shore.w, smoothstep(shore.x, shore.y, x))
+uniform vec3 uClip;                    // creature hidden below the water: depth = clamp((x0 − x)·slope, 0, max)
+uniform vec4 uRip[8];                  // footfall ripples on the wet sand: (x, z, age s, amplitude)
+uniform float uFlameGain;
+// per set: x = chord scale (display thickness / real), y = transmission gain, z = wet sheen, w = warm (0 blood-red … 1 amber)
+uniform vec4 uLook0, uLook1;
+float seaZ(float x) { return mix(uShore.z, uShore.w, smoothstep(uShore.x, uShore.y, x)); }
+float clipDepth(float x) { return clamp((uClip.x - x) * uClip.y, 0.0, uClip.z); }
 vec3 sunL;                             // sun direction in the local frame (set in main)
 vec3 skyL(vec3 dLocal, bool withSun) { return skyColor(uRot * dLocal, withSun); }
 float h12(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
@@ -93,6 +101,7 @@ float furOf(int set, int i) { return texelFetch(uPrims, ivec2(i * 4 + 3, set), 0
 void sil2(int set, vec2 p, out vec2 d, out vec4 attr, out vec4 attrF) {
   int n = set == 0 ? uN0 : uN1;
   vec4 xf = set == 0 ? uXf0 : uXf1;
+  float cs = set == 0 ? uLook0.x : uLook1.x;
   float dn = 1e9, df = 1e9, cut = 1e9;
   attr = vec4(100.0, 0.0, 0.0, 0.0); attrF = attr;
   for (int i = 0; i < ${MAXP}; i++) {
@@ -109,11 +118,13 @@ void sil2(int set, vec2 p, out vec2 d, out vec4 attr, out vec4 attrF) {
     if (abs(M.y - 5.0) < 0.5) { cut = min(cut, di); continue; }
     float rl = mix(ra, rb, hh);
     float inset = rl + min(di, 0.0);
-    float chord = 2.0 * sqrt(max(0.0, rl * rl - inset * inset)) / xf.w * 1000.0;     // real mm
+    float chord = 2.0 * sqrt(max(0.0, rl * rl - inset * inset)) / xf.w * 1000.0 * cs;  // mm (real, or displayed when cs = k)
     bool thin = abs(M.y - 1.0) < 0.5 || abs(M.y - 6.0) < 0.5;
-    vec4 at = vec4(thin ? min(chord, M.z * 1000.0) : chord, furOf(set, i), thin ? 1.0 : 0.0, abs(M.y - 4.0) < 0.5 ? 1.0 : 0.0);
+    // z: local radius in mm (flesh) or −1 (thin sheets); w: mm per world unit
+    float mmPer = 1000.0 * cs / xf.w;
+    vec4 at = vec4(thin ? min(chord, M.z * 1000.0) : chord, furOf(set, i), thin ? -1.0 : rl * mmPer, mmPer);
     // fin rays: dark cores inside membranes
-    if (abs(M.y - 1.0) < 0.5) at.x = mix(at.x, 3.0, smoothstep(0.45 * rl, 0.1 * rl, abs(inset - rl) + 0.0));
+    if (abs(M.y - 1.0) < 0.5) at.x = mix(at.x, 3.0, (1.0 - smoothstep(0.1 * rl, 0.45 * rl, abs(inset - rl))));
     float k = M.x * xf.w;
     if (isFar) {
       if (k > 0.0) { float h = clamp(0.5 + 0.5 * (df - di) / k, 0.0, 1.0); df = mix(df, di, h) - k * h * (1.0 - h); attrF = mix(attrF, at, h); }
@@ -153,24 +164,35 @@ vec3 flameAt(vec2 p, out float cov) {
   float sway = 0.12 * sin(t * 7.3 + q.y * 3.0) * q.y;
   float w = 0.26 * pow(max(0.0, 1.0 - q.y), 0.65) * smoothstep(-0.35, 0.05, q.y) * (0.75 + 0.5 * n1);
   float dd = abs(q.x - sway - (n2 - 0.5) * 0.25 * q.y) - w;
-  float e = smoothstep(0.03, -0.05, dd) * smoothstep(1.35, 0.3, q.y + (n1 - 0.5) * 0.6);
+  float e = (1.0 - smoothstep(-0.05, 0.03, dd)) * (1.0 - smoothstep(0.3, 1.35, q.y + (n1 - 0.5) * 0.6));
   cov = e;
-  float core = smoothstep(0.0, -0.12, dd) * smoothstep(0.7, 0.0, q.y);
+  float core = (1.0 - smoothstep(-0.12, 0.0, dd)) * (1.0 - smoothstep(0.0, 0.7, q.y));
   vec3 hot = vec3(1.0, 0.72, 0.38) * 9.0, mid = vec3(1.0, 0.36, 0.07) * 4.5, tip = vec3(0.9, 0.16, 0.02) * 1.4;
   vec3 c = mix(mid, hot, core);
   c = mix(c, tip, smoothstep(0.35, 1.2, q.y + (1.0 - e) * 0.3));
-  return c * e;
+  return c * e * uFlameGain;
 }
 // ground: wet sand in front, the sea behind the shoreline (z < uSeaZ); returns shaded colour
 vec3 groundAt(vec3 ro, vec3 rd, float tg, float silMirror, float mirrorFar, float shadow) {
   vec3 G = ro + rd * tg;
-  bool sea = G.z < uSeaZ || uWaterFront > 0.5;
+  bool sea = G.z < seaZ(G.x) || uWaterFront > 0.5;
   vec2 q = vec2(G.x + uScroll, G.z);
+  // footfall ripples: rings spreading through the wet film from each planted foot
+  vec2 rip = vec2(0.0);
+  for (int i = 0; i < 8; i++) {
+    vec4 R = uRip[i];
+    if (R.w <= 0.0 || R.z < 0.0 || R.z > 1.6) continue;
+    vec2 d = vec2(G.x - R.x, (G.z - R.y) * 1.0);
+    float r = length(d), front = R.z * 1.1;
+    float rf = (r - front) / 0.12;
+    float ring = sin((r - front) * 38.0) * exp(-rf * rf) * exp(-R.z * 2.2) * R.w;
+    rip += d / max(r, 1e-3) * ring;
+  }
   // micro-normal: capillary ripples on water, a wet film with dry patches on the sand
   float wet = sea ? 1.0 : smoothstep(0.35, 0.65, fbm2(q * 0.35) + 0.25 * fbm2(q * 2.1)) * 0.8 + 0.2;
   float amp = sea ? 0.06 : 0.02;
   vec2 g = vec2(fbm2(q * vec2(0.4, 1.3) + vec2(uT * 0.25, 0.0)) - 0.5, fbm2(q * vec2(0.4, 1.3) + vec2(3.1, uT * 0.18)) - 0.5);
-  vec3 n = normalize(vec3(g.x * amp, 1.0, g.y * amp * 3.0));
+  vec3 n = normalize(vec3(g.x * amp + rip.x * 0.08, 1.0, g.y * amp * 3.0 + rip.y * 0.08));
   vec3 r = reflect(rd, n);
   r.y = abs(r.y);
   float F = 0.02 + 0.98 * pow(1.0 - max(dot(-rd, n), 0.0), 5.0);
@@ -212,9 +234,13 @@ vec3 shadeSil(vec3 bg, vec2 p, float d, vec4 at, float pxw, vec3 sunS, bool farS
   if (cov <= 0.0) return bg;
   // light through the body along the view ray: haemoglobin-red transmission of the backlight
   float mm = at.x;
+  // flesh: the chord can't be thinner than the depth inside the BLENDED outline allows (smooth-union
+  // fillets lie outside every single primitive; without this they'd render as see-through bands)
+  if (at.z > 0.0) { float dep = max(-d, 0.0) * at.w; mm = max(mm, 2.0 * sqrt(max(0.0, dep * (2.0 * at.z - dep)))); }
   if (furW > 0.0 && d > -furW * 1.2) mm = min(mm, mix(2.5, 0.3, smoothstep(-furW * 1.2, 0.0, d)));   // only the fringe of fibres
-  vec3 sig = vec3(0.55, 2.1, 3.6);
-  vec3 trans = bg * exp(-sig * mm) * 0.9;
+  vec4 look = mix(uLook0, uLook1, uMorph);
+  vec3 sig = mix(vec3(0.55, 2.1, 3.6), vec3(0.4, 0.62, 1.25), look.w);
+  vec3 trans = bg * exp(-sig * mm) * 0.9 * look.y;
   if (furW > 0.0 && d > -furW * 1.2) {
     // hair is keratin, not blood: fibres scatter the backlight golden-white, and only where they
     // are sparse enough to be seen through (the outer tips)
@@ -228,6 +254,12 @@ vec3 shadeSil(vec3 bg, vec2 p, float d, vec4 at, float pxw, vec3 sunS, bool farS
   float rim = exp(min(d, 0.0) / max(HP * 1.3, pxw * 0.7)) * facing * 0.35;
   vec3 body = vec3(0.0032, 0.0024, 0.0021) + bg * 0.004;
   vec3 c = body + trans + bg * rim;
+  // wet skin: a thin specular sheen along the upward-facing edge, mirroring the sky above
+  if (look.z > 0.0) {
+    float up = max(nn.y, 0.0);
+    float band = exp(min(d, 0.0) / max(HP * 2.2, pxw * 0.9)) * (1.0 - exp(min(d, 0.0) / max(HP * 0.5, pxw * 0.3)) * 0.6);
+    c += (bg * 0.55 + skyL(vec3(0.0, 1.0, 0.0), false) * 0.8) * up * up * band * look.z;
+  }
   // torch light on the edges facing the flame
   if (uFlameOn > 0.5) {
     vec2 fl = uFlame.xy + vec2(0.0, uFlame.z * 0.35);
@@ -254,7 +286,7 @@ void main() {
     vec3 G = ro + rd * tg;
     vec2 m = vec2(P.x, -P.y) + (vec2(fbm2(G.xz * vec2(1.5, 5.0)), fbm2(G.xz * vec2(1.5, 5.0) + 4.0)) - 0.5) * vec2(0.03, 0.05) * uXf0.w;
     float sm = 0.0, smf = 0.0;
-    if (m.x > uBox.x - 0.3 && m.x < uBox.z + 0.3 && m.y < uBox.w + 0.3) {
+    if (m.x > uBox.x - 0.3 && m.x < uBox.z + 0.3 && m.y < uBox.w + 0.3 && m.y > clipDepth(m.x)) {
       vec2 d; vec4 at, af; silField(m, d, at, af);
       float fw = pxw * 3.0;
       sm = clamp(0.5 - d.x / fw, 0.0, 1.0); smf = clamp(0.5 - d.y / fw, 0.0, 1.0);
@@ -271,15 +303,22 @@ void main() {
         sh = 1.0 - 0.85 * clamp(0.5 - min(d.x, d.y) / blur, 0.0, 1.0);
       }
     }
-    col = uBgOn > 0.5 ? texture(uBg, vUv).rgb * (1.0 - 0.8 * sm - 0.1 * smf) : groundAt(ro, rd, tg, sm, smf, sh);
+    vec4 bgs = texture(uBg, vUv);
+    bool land = uBgOn > 1.5 && bgs.a > 0.0 && bgs.a < 2500.0;
+    if (uBgOn > 0.5 && uBgOn < 1.5) col = bgs.rgb * (1.0 - 0.8 * sm - 0.1 * smf);
+    else if (land) col = bgs.rgb;
+    else col = groundAt(ro, rd, tg, sm, smf, sh);
     float fc; vec3 fr = flameAt(vec2(P.x, -P.y), fc);
     col += fr * 0.35;
   } else {
     col = skyL(rd, true);
     // the sea & far shore meet the sky at the horizon: ground beyond the plane
     if (rd.y < 0.0) col = groundAt(ro, rd, tg, 0.0, 0.0, 1.0);
-    if (uBgOn > 0.5) col = texture(uBg, vUv).rgb;
-    if (P.x > uBox.x && P.x < uBox.z && P.y > uBox.y && P.y < uBox.w) {
+    vec4 bgs = texture(uBg, vUv);
+    if (uBgOn > 0.5 && uBgOn < 1.5) col = bgs.rgb;
+    // hybrid: the chapter's air view above the horizon (sky, birds, far land) and wherever it sees land
+    if (uBgOn > 1.5 && (rd.y >= 0.0 || (bgs.a > 0.0 && bgs.a < 2500.0))) col = bgs.rgb;
+    if (P.x > uBox.x && P.x < uBox.z && P.y > uBox.y + clipDepth(P.x) && P.y < uBox.w) {
       vec2 d; vec4 at, af; silField(P.xy, d, at, af);
       col = shadeSil(col, P.xy, d.y, af, pxw, sunS, true);
       col = shadeSil(col, P.xy, d.x, at, pxw, sunS, false);
@@ -449,6 +488,9 @@ export function makeCreatureRenderer({ mode = 'sil', skyGLSL = DEFAULT_SKY, unif
     uAlb0: { value: new THREE.Vector3() }, uAlb1: { value: new THREE.Vector3() }, uAlb0b: { value: new THREE.Vector3() }, uAlb1b: { value: new THREE.Vector3() },
     uSkin0: { value: new THREE.Vector4() }, uSkin1: { value: new THREE.Vector4() },
     uRot: { value: new THREE.Matrix3() }, uOrigin: { value: new THREE.Vector3() }, uBgOn: { value: 0 },
+    uShore: { value: new THREE.Vector4(0, 1, -3, -3) }, uClip: { value: new THREE.Vector3(-1e3, 0, 0) },
+    uRip: { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, 0, -1, 0)) }, uFlameGain: { value: 1 },
+    uLook0: { value: new THREE.Vector4(1, 1, 0, 0) }, uLook1: { value: new THREE.Vector4(1, 1, 0, 0) },
     uBg: { value: (() => { const t = new THREE.DataTexture(new Uint8Array(4), 1, 1); t.needsUpdate = true; return t; })() },
   };
   for (const k of ['uSunDir', 'uSunCol', 'uSkyZen', 'uSkyHor', 'uSkyHor2', 'uSkyMid']) if (!U[k]) U[k] = { value: new THREE.Vector3(0.3, 0.3, 0.3) };
@@ -469,6 +511,7 @@ export function makeCreatureRenderer({ mode = 'sil', skyGLSL = DEFAULT_SKY, unif
       data.set([p.a[0], p.a[1], p.a[2], p.ra, p.b[0], p.b[1], p.b[2], p.rb, p.k, p.kind, p.thick, p.far, p.fur ?? (p.kind === 2 ? 1 : 0), 0, 0, 0], o);
     }
     (set ? U.uN1 : U.uN0).value = n;
+    (set ? U.uLook1 : U.uLook0).value.set(...(C.look || [1, 1, 0, 0]));
     (set ? U.uXf1 : U.uXf0).value.set(C.world[0], C.world[1], C.world[2], C.k);
     if (C.alb) (set ? U.uAlb1 : U.uAlb0).value.set(...C.alb[0]), (set ? U.uAlb1b : U.uAlb0b).value.set(...C.alb[1]);
     if (C.skin) (set ? U.uSkin1 : U.uSkin0).value.set(...C.skin);
@@ -505,7 +548,11 @@ export function makeCreatureRenderer({ mode = 'sil', skyGLSL = DEFAULT_SKY, unif
       if (o.flame) { U.uFlameOn.value = 1; U.uFlame.value.set(...o.flame); } else U.uFlameOn.value = 0;
       // local frame of the walk (defaults: world) and optional background (e.g. ch6's air view output)
       if (o.frame) { U.uRot.value.copy(o.frame.rot); U.uOrigin.value.copy(o.frame.origin); } else { U.uRot.value.identity(); U.uOrigin.value.set(0, 0, 0); }
-      if (o.bg) { U.uBg.value = o.bg; U.uBgOn.value = 1; } else U.uBgOn.value = 0;
+      if (o.bg) { U.uBg.value = o.bg; U.uBgOn.value = o.hybrid ? 2 : 1; } else U.uBgOn.value = 0;
+      if (o.shore) U.uShore.value.set(...o.shore); else U.uShore.value.set(0, 1, o.seaZ ?? -3, o.seaZ ?? -3);
+      if (o.clip) U.uClip.value.set(...o.clip); else U.uClip.value.set(-1e3, 0, 0);
+      for (let i = 0; i < 8; i++) { const r = o.ripples && o.ripples[i]; if (r) U.uRip.value[i].set(...r); else U.uRip.value[i].set(0, 0, -1, 0); }
+      U.uFlameGain.value = o.flameGain ?? 1;
       renderer.setRenderTarget(target);
       renderer.render(scene, ocam);
     },

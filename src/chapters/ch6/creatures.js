@@ -122,7 +122,7 @@ export function makeCreatures(ctx, G, n) {
       float ly = vL.y;
       vec3 c = mix(silver * 1.1 + vec3(0.02, 0.03, 0.03), back + silver * 0.15, smoothstep(0.015, 0.06, ly));
       c = mix(c, silver * 1.4 + vec3(0.06, 0.08, 0.08), (1.0 - smoothstep(-0.08, -0.03, ly)));
-      c += silver * 0.9 * exp(-pow((ly - 0.008) / 0.01, 2.0)) * step(-0.35, vX);      // lateral line
+      c += silver * 0.9 * exp(-((ly - 0.008) / 0.01) * ((ly - 0.008) / 0.01)) * step(-0.35, vX);      // lateral line
       c *= 0.85 + 0.3 * vTr;
       // the school's flash: flanks turning into the sun
       float dep = max(-vP.y, 0.0);

@@ -259,10 +259,10 @@ in vec3 vP; in vec3 vN; out vec4 fragColor;`;
       vec3 n = normalize(nD - (gH.x * TX + gH.y * TY) * 16.0);
       float aa = max(fwidth(V), 1e-4);
       float body = smoothstep(0.10, 0.24, V);
-      float mem = exp(-pow((V - 0.15) / (0.028 + aa * 1.3), 2.0));          // plasma membrane
-      float cortex = exp(-pow((V - 0.3) / (0.02 + aa), 2.0)) * body * 0.12;  // faint inner cortex
+      float mem = exp(-((V - 0.15) / (0.028 + aa * 1.3)) * ((V - 0.15) / (0.028 + aa * 1.3)));          // plasma membrane
+      float cortex = exp(-((V - 0.3) / (0.02 + aa)) * ((V - 0.3) / (0.02 + aa))) * body * 0.12;  // faint inner cortex
       float nucl = smoothstep(0.275, 0.325, Hd);
-      float nrim = exp(-pow((Hd - 0.29) / (0.006 + fwidth(Hd)), 2.0));
+      float nrim = exp(-((Hd - 0.29) / (0.006 + fwidth(Hd))) * ((Hd - 0.29) / (0.006 + fwidth(Hd))));
       float nucleolus = smoothstep(0.338, 0.35, Hd);
       float gran = smoothstep(0.45, 0.95, texture(uNoise, uv * 6.0 + s.b * 3.0).a) * body * (1.0 - nucl);
       // lens refraction of whatever lies behind the cell (rock, or open water early on)

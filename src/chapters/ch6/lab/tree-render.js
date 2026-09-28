@@ -224,11 +224,11 @@ export function makeTree(skel, placement, shared, opts = {}) {
       // young trees keep smooth periderm with horizontal lenticels; fissured rhytidome only at
       // the base of the trunk; current-year shoots are greener / redder
       float age = smoothstep(0.004, 0.035, vR);
-      float base = age * smoothstep(1.6, 0.15, vH) * smoothstep(0.03, 0.07, vR);
+      float base = age * (1.0 - smoothstep(0.15, 1.6, vH)) * smoothstep(0.03, 0.07, vR);
       vec2 q = vec2(vUV.x * 26.0, vUV.y * 3.2);
       float f1 = vn(q + vec2(0.0, vn(q * 0.5) * 2.0));
       float f2 = vn(q * vec2(2.3, 1.7) + 7.1);
-      float fiss = smoothstep(0.30, 0.05, abs(f1 - 0.5)) * base;
+      float fiss = (1.0 - smoothstep(0.05, 0.30, abs(f1 - 0.5))) * base;
       float len = smoothstep(0.8, 0.9, vn(vec2(vUV.x * 55.0, vUV.y * 9.0))) * (0.4 + 0.6 * age);
       vec3 shoot = vec3(0.10, 0.085, 0.045);
       vec3 alb = mix(shoot, mix(uBarkYoung, uBarkOld, age), smoothstep(0.0, 0.6, age));
@@ -237,7 +237,7 @@ export function makeTree(skel, placement, shared, opts = {}) {
         // birch: chalky white periderm with dark horizontal lenticel dashes and dark base
         vec3 wht = vec3(0.52, 0.50, 0.47) * (0.85 + 0.2 * f2);
         float dash = smoothstep(0.72, 0.8, vn(vec2(vUV.x * 14.0, vUV.y * 16.0))) * smoothstep(0.3, 0.7, vn(vec2(vUV.x * 3.0, vUV.y * 30.0)));
-        wht = mix(wht, vec3(0.06, 0.05, 0.045), clamp(dash + fiss * 1.5 + smoothstep(0.6, 0.1, vH) * 0.6, 0.0, 1.0));
+        wht = mix(wht, vec3(0.06, 0.05, 0.045), clamp(dash + fiss * 1.5 + (1.0 - smoothstep(0.1, 0.6, vH)) * 0.6, 0.0, 1.0));
         alb = mix(alb, wht, smoothstep(0.1, 0.5, age));
       } else {
         alb *= 1.0 - 0.35 * len;
@@ -393,6 +393,10 @@ export function makeTree(skel, placement, shared, opts = {}) {
       vec3 c = uSunCol * sunTint(sh) * (alb * ndl + T + vec3(spec));
       c += alb * skyIrr(nd) * (0.25 + 0.75 * vSky);
       c += (alb + trn * 0.5) / 0.1 * canopyFill(vSun, vSky) * 0.1;
+      // a flush: buds that have just opened on this note glow, backlit and bright, for a moment
+      // (growth steps on every marimba note; the leitmotif's steps are three times larger)
+      float fresh = exp(-age / 0.010) * (1.0 - die);
+      c += (uYoung * vec3(1.3, 1.5, 0.8) * (0.6 + 1.6 * fwd) + trn * 1.2) * uSunCol * fresh * 0.55;
       c *= 1.0 - uDusk;
       fragColor = vec4(c, distance(vP, uCamPos));
     }`,

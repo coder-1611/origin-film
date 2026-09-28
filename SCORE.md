@@ -15,7 +15,7 @@ scheduled live for the player.
 | III · First Light | 8–17 | 32–58 | D minor, 84→101.5 | Pads, FM-bell star births, leitmotif on bells (12–13), riser + kick on every beat in bar 17 |
 | IV · Accretion | 18–28 | 58–81.99 | D minor → pivot, 101.5→118.6 | Drums in, arpeggiated plucks, riser bar 22, **Theia IMPACT 23.1**, ring/moon pads, C (V of F) in 27–28 |
 | V · Pale Blue | 29–40 | 81.99–106 | **F major**, 118.6→120 | Open pads, Karplus-Strong arpeggios, soft kick 33–38, whoosh 37, splash 39.1, bubbles |
-| VI · Life | 41–64 | 106–154 | F major, 120 | Marimba ostinato + leitmotif, cell-division pops, soft four-on-the-floor from 45, hats; the march: footsteps on the beat grid, animal calls, the torch |
+| VI · Life | 41–64 | 106–154 | F major, 120 | Marimba ostinato + leitmotif, cell-division pops, soft four-on-the-floor from 45, hats; from 128 the groove gives way to a string bed and the shore's own sound: surf, wind, flock, and synthesised animals on their own clocks; the torch |
 | VII · Fire to Fiber | 65–77 | 154–180 | F major, 120 | Full drums, sub bass, **supersaw lead leitmotif**, crackle, clanks, hiss, arc zaps |
 | VIII · The Prompt | 78–84 | 180–196 | → D minor, 120 → rit. → 60 | Typing: keyclicks accelerating into a granular riser; Enter 82.1; leitmotif on piano-pluck |
 | (coda) | — | 196–200 | D, free | Drone returns; final E→D resolution; loops to 0:00 |
@@ -78,12 +78,21 @@ which is also the first sound of the loop.
 * **SFX:** whoosh (a swept, panned noise band), bubble chirps, cell pops, fire crackle (a granular
   noise-grain stream), metallic FM clanks, steam hiss, arc zaps (sine chirps with FM),
   keyclicks (bandpassed noise tick plus a 200 Hz thock, gain ∝ 1/√rate).
-* **The march (VI):** one footstep per foot-plant in `timeline.footsteps`, locked to the beat grid
-  and panned to the walker: a wet slap (tetrapod), soft pads (amphibian, mammal), a 16th-note patter
-  (reptile), a sub-bass stomp on every kick (dinosaur), knuckles (ape), and bare feet on sand
-  (human). Calls: a pulsed formant croak, a hiss, an FM-growl roar through a waveshaper on the
-  bar-57 downbeat (and again on bar 58), rising chirps, and a breathy two-note hoot. The torch catches with a whoosh
-  and its own granular crackle, which hands over to VII's fire.
+* **The shore (VI, 128–151 s):** the groove stops. A slow string ensemble (narrow detune, 1.8 s bow
+  attack) holds the harmony, and the sound of the place comes forward. It is all synthesised from
+  the research in `docs/research/animal-realism.md` (`src/audio/nature/`) and scheduled from each
+  animal's own clock (`timeline.march.events`), so nothing lands on the beat:
+  - **Ambience:** surf as individual waves (lognormal ~8.5 s periods with sets, the break peaking
+    at 300–500 Hz, swash fizz and backwash), gusting wind, and a distant gull and tern flock.
+  - **Footsteps:** each scaled by mass (thump ∝ m^−1/3 in frequency, m^2/3 in level) and placed
+    outdoors by distance, with air absorption and a ground reflection.
+  - **The theropod's closed-mouth boom:** f0 ≈ 33 Hz, 91 % of its energy at 20–100 Hz, after
+    gulps, an inhale and a sub-audible vibration, modelled on the cassowary and the crocodilian.
+  - **The rest of the cast:** the tetrapod's haul-out, the lizard's hiss, a distant fox's barks,
+    and the chimp's pant-hoot build and climax.
+  - **Ducking:** the music ducks 5 dB under the calls.
+
+  The torch catches with a whoomph and a crackle that hands over to VII's fire.
 
 ## Mix
 

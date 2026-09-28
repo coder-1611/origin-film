@@ -1,6 +1,6 @@
 # Making ORIGIN
 
-ORIGIN is a 3-minute film, 13.8 billion years in one unbroken camera move. It was written
+ORIGIN is a 3:20 film, 13.8 billion years in one unbroken camera move. It was written
 entirely in HTML, JavaScript and GLSL by Claude (Opus 5.5) working in Claude Code, from a
 single prompt (the text typed on screen in chapter VIII is that prompt, verbatim). There are
 no video frameworks, no stock footage, no samples and no API keys. The renderer, the
@@ -18,7 +18,7 @@ sequence. `snap.mjs --determinism` checks this.
 **One source of truth.** `src/timeline.js` holds:
 - the tempo map;
 - the chord chart;
-- every note (1,597 of them);
+- every note;
 - every SFX cue;
 - every picture event (star births, collisions, bubbles, cell divisions, leaf flushes, fibre arcs);
 - every typed character's timestamp and key position;
@@ -26,6 +26,15 @@ sequence. `snap.mjs --determinism` checks this.
 
 The score and the picture both import it. When a bell rings in chapter III, a star ignites at
 the screen position that the bell is panned to, because both read the same event.
+
+**The film is 3:20.** It was first built to 3:00 exactly. After the owner watched it, two
+things changed: the trees had to look natural, and the evolution between the birds and fire
+was missing. Chapter VI grew by 10 bars (20 s) to hold that evolution. VII and VIII moved
+bodily: the timeline shifted them by exactly +10 bars and +20 s, and each chapter re-anchored
+its own times to its start. `tools/verify/ab.mjs` then proved the move, re-rendering the old
+film's frames at t + 20 and comparing pixels: VIII matched 79/79 exactly, and VII matched
+101/102. The one miss exposed a real old bug, a steam glow drawn twice at 149.000, which is
+now fixed.
 
 **The accelerando was solved, not guessed.** The tempo ramps 84 → 120 BPM between two
 breakpoints (33.3509 s and 83.9824 s), found by Newton's method so that the chapter boundaries
@@ -55,7 +64,7 @@ at 58, 82 and 106 s land exactly on downbeats.
 | III | Half-res volumetric fbm nebula with baked light volumes and god rays; a density-wave galaxy of ~219k particles | builder 2 |
 | IV | Three.js scene graph: a Keplerian disk of 400k grains, the Theia impact, a debris ring → the Moon; depth-of-field bokeh | builder 3 |
 | V | A procedural planet: Rayleigh + Mie scattering, a GGX sun glint, cyclone clouds; one continuous dive into the sea | builder 4 |
-| VI | Gray-Scott reaction-diffusion → an L-system forest (176 trees) → 420 boids that turn from fish into birds | builder 5 |
+| VI | Gray-Scott reaction-diffusion → a space-colonization forest growing from seedlings → 420 boids turning from fish into birds → the evolution march: one intricate silhouette walking from tetrapod to human, every footstep locked to a beat | builder 5 + a research agent |
 | VII | Hand-authored SVG path data drawn on as HDR light; a night Earth with ~10k lights and great-circle fibre arcs | builder 6 |
 | VIII | A Three.js laptop; the prompt typed live; **real recursion**: the film's own output rendered back onto the screen, up to 16 levels | builder 7 |
 
@@ -63,6 +72,27 @@ The chapters were built in parallel by seven Claude subagents from one shared br
 (`docs/BRIEF.md`). The brief was a contract: the ctx API, the determinism rules, the
 performance budget and exact hand-off specs. For example, "the Earth disc at the exact centre,
 radius 0.3056 H, lit from the upper-left" is shared by IV and V, and both measured it at 330.x px.
+
+## Making nature look natural
+
+The first forest was an L-system, and it looked like one. An Opus research agent studied why
+AI-written WebGL nature looks fake, and prototyped the fixes before anything went into the film
+(`docs/research/natural-forms.md`). Its findings:
+- **Leaf orientation** was the single biggest improvement. Flat horizontal leaves are seen
+  edge-on from water level, so the crown looks see-through; leaves turned outward fixed it.
+- **Branching from competition, not rules:** space colonization, a dominant leader, and trunks
+  that taper and flare at the root.
+- **The crown lit as a volume:** dark inside, bright on sunlit clumps, backlit leaves glowing
+  with dark veins.
+- **Restrained colour and small leaves.**
+- **Growth that obeys biology:** trees grow from their tips and thicken, never simply scale up;
+  buds unfold.
+
+For the animals it built both realistic 3D creatures and intricate silhouettes, and compared
+them. The 3D versions read as vinyl toys, so the evolution is told in silhouette against the
+sunset: fur, scale and filament fringes, webbed fins, clawed toes, and a theropod drawn as
+spline curves. A gait engine plants a foot on the exact frame of each of the 86 footstep
+sounds.
 
 ## Review loop
 
@@ -98,7 +128,7 @@ both ends. On the audio side:
 
 | Measure | Value |
 |---|---|
-| Final render | 10,800 frames at 1920×1080 in 4.8 minutes (4 workers, ~38 fps) |
+| Final render | 12,000 frames at 1920×1080 (4 workers) |
 | Encode | about 7.5 minutes |
 | Draft | 5,400 frames at 960×540 in 1.6 minutes |
 | Score render | about 5–8 minutes in `OfflineAudioContext` (single-threaded, while sharing the machine) |

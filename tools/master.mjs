@@ -7,7 +7,7 @@ import { ROOT } from './lib/serve.mjs';
 import { readF32, writeWavF32, integratedLoudness, truePeakDb, glueCompress, tpLimit } from './lib/dsp.mjs';
 const T = await import(path.join(ROOT, 'src/timeline.js'));
 
-const SR = 48000, DUR = T.DURATION, TARGET = -14, CEIL = -1.5;
+const SR = 48000, DUR = T.DURATION, TARGET = -14, CEIL = -2.0;   // 1 dB of margin for the AAC encode
 const raw = readF32(path.join(ROOT, 'renders/score-raw.f32'));
 const n = DUR * SR;
 let x = new Float32Array(n * 2);

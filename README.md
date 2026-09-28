@@ -1,7 +1,7 @@
 # ORIGIN
 
 **13.8 billion years in one unbroken camera move**, from the Big Bang to a person typing the
-prompt that made this film. It runs 3 minutes at 1920×1080 and 60 fps. It is written entirely in
+prompt that made this film. It runs 3:20 at 1920×1080 and 60 fps. It is written entirely in
 HTML, JS and GLSL, and its score is synthesised in code. There are no video frameworks, no stock
 anything and no samples. Its last frame is its first, so it loops forever.
 
@@ -19,9 +19,9 @@ anything and no samples. Its last frame is its first, so it loops forever.
 
 ```
 npm install
-npm run audio     # score → OfflineAudioContext (Chrome) → master (−14 LUFS, −1.5 dBTP) → per-frame features
+npm run audio     # score → OfflineAudioContext (Chrome) → master (−14 LUFS, −2.0 dBTP) → per-frame features
 npm run draft     # 960×540 @ 30 fps preview → renders/origin-draft.mp4
-npm run render    # 1920×1080 @ 60 fps, 4 GPU workers, resumable → renders/origin.mp4
+npm run render    # 1920×1080 @ 60 fps (12,000 frames), 4 GPU workers, resumable → renders/origin.mp4
 npm run verify    # measures the delivered MP4 → docs/VERIFICATION.md
 npm run snap -- --t 12.5,69.4 --w 960 --h 540   # any frame(s) to images
 ```

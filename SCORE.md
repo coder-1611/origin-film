@@ -97,7 +97,7 @@ which is also the first sound of the loop.
 * **Master (in-graph):** a glue compressor (−18 dB, 2.5:1, 20 ms / 250 ms) → a peak limiter.
 * **Mastering (offline, `tools/master.mjs`):** measure integrated loudness (BS.1770 / EBU R128,
   gated), apply a gain to reach −14 LUFS, then a 4× oversampled lookahead true-peak limiter at
-  −1.5 dBTP (0.5 dB of margin for the AAC encode). The result is verified with `ffmpeg -af ebur128=peak=true`.
+  −2.0 dBTP (1 dB of margin: the AAC encode overshoots by up to ~0.6 dB). The result is verified with `ffmpeg -af ebur128=peak=true`.
 
 ## Loop
 

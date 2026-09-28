@@ -15,7 +15,7 @@ scheduled live for the player.
 | III · First Light | 8–17 | 32–58 | D minor, 84→101.5 | Pads, FM-bell star births, leitmotif on bells (12–13), riser + kick on every beat in bar 17 |
 | IV · Accretion | 18–28 | 58–81.99 | D minor → pivot, 101.5→118.6 | Drums in, arpeggiated plucks, riser bar 22, **Theia IMPACT 23.1**, ring/moon pads, C (V of F) in 27–28 |
 | V · Pale Blue | 29–40 | 81.99–106 | **F major**, 118.6→120 | Open pads, Karplus-Strong arpeggios, soft kick 33–38, whoosh 37, splash 39.1, bubbles |
-| VI · Life | 41–54 | 106–134 | F major, 120 | Marimba ostinato + leitmotif, cell-division pops, soft four-on-the-floor from 45, hats |
+| VI · Life | 41–54 | 106–134 | F major, 120 | Marimba ostinato + leitmotif, cell-division pops, soft four-on-the-floor from 45, hats; the march: footsteps on the beat grid, animal calls, the torch |
 | VII · Fire to Fiber | 55–67 | 134–160 | F major, 120 | Full drums, sub bass, **supersaw lead leitmotif**, crackle, clanks, hiss, arc zaps |
 | VIII · The Prompt | 68–74 | 160–176 | → D minor, 120 → rit. → 60 | Typing: keyclicks accelerating into a granular riser; Enter 72.1; leitmotif on piano-pluck |
 | (coda) | — | 176–180 | D, free | Drone returns; final E→D resolution; loops to 0:00 |
@@ -77,6 +77,12 @@ which is also the first sound of the loop.
 * **SFX:** whoosh (a swept, panned noise band), bubble chirps, cell pops, fire crackle (a granular
   noise-grain stream), metallic FM clanks, steam hiss, arc zaps (sine chirps with FM),
   keyclicks (bandpassed noise tick plus a 200 Hz thock, gain ∝ 1/√rate).
+* **The march (VI):** one footstep per foot-plant in `timeline.footsteps`, locked to the beat grid
+  and panned to the walker: a wet slap (tetrapod), soft pads (amphibian, mammal), a 16th-note patter
+  (reptile), a sub-bass stomp on every kick (dinosaur), knuckles (ape), and bare feet on sand
+  (human). Calls: a pulsed formant croak, a hiss, an FM-growl roar through a waveshaper on the
+  bar-51 downbeat, rising chirps, and a breathy two-note hoot. The torch catches with a whoosh
+  and its own granular crackle, which hands over to VII's fire.
 
 ## Mix
 

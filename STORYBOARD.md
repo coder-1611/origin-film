@@ -18,7 +18,7 @@ ritardando to 60 BPM (168 → 176 s), then free time. Chapter boundaries are dow
 | III | FIRST LIGHT | 32.000 | 58.000 | 8–17 | Volumetric fbm raymarch + god rays → density-wave galaxy |
 | IV | ACCRETION | 58.000 | 81.988 | 18–28 | Three.js scene graph, custom bloom + DOF + grain |
 | V | PALE BLUE | 81.988 | 106.000 | 29–40 | Procedural planet: terrain, ocean glint, atmospheric scattering, clouds |
-| VI | LIFE | 106.000 | 134.000 | 41–54 | Gray-Scott reaction-diffusion → L-system forest → boids |
+| VI | LIFE | 106.000 | 134.000 | 41–54 | Gray-Scott reaction-diffusion → growing forest → boids → the evolution march |
 | VII | FIRE TO FIBER | 134.000 | 160.000 | 55–67 | SVG path draw-on → night-Earth with great-circle arcs |
 | VIII | THE PROMPT | 160.000 | 180.000 | 68–74 + free | UI compositing + real recursive feedback (Droste) |
 
@@ -126,14 +126,16 @@ inside it.
 
 | t | Beat |
 |---|---|
-| 106 (41.1) | Macro underwater. **Reaction-diffusion cells** bloom: translucent, lit membranes. Every `timeline.cellDivisions` event seeds a split at its (x, y), heard as a pop pitched to the chord. |
-| 106–114 (41–44) | Colonies divide. The camera pulls back: they are mats on shallow rock. |
-| 114–122 (45–48) | **Over-under shot** at the waterline. Above it, an **L-system forest** grows leaf by leaf on the shore, and each marimba note adds a flush of leaves. Below it, stromatolites and kelp. A soft four-on-the-floor kick enters. |
-| 122–126 (49–50) | A **fish school (boids)** swirls below the waterline. |
-| 126 (51.1) | The school breaches the surface, and each fish becomes a bird as it crosses the waterline. The flock rises and the camera tilts up with it. |
-| 130–134 (53–54) | Sunset. A murmuration wheels around the low sun sitting on the horizon at screen centre. The sun sinks, and its last glint is a bright ember at the exact centre (133.5–134). |
+| 106 (41.1) | Macro underwater. **Reaction-diffusion cells** bloom: translucent, lit membranes. Every `timeline.cellDivisions` event (106–111.4) seeds a split at its (x, y), heard as a pop pitched to the chord. |
+| 106–113.5 (41–44) | Colonies divide. The camera pulls back to show mats on shallow rock, then rises through the surface; the meniscus sweeps down the frame. |
+| 114–120 (45–47) | **Over-under shot** at the waterline. Above it, a **forest sprouts naturally**: seedlings, then saplings, then young trees, with buds unfolding into leaves on the marimba (`timeline.leafFlushes`, bars 45–47, motif flushes most prominent). Below it, stromatolites and kelp. |
+| 120–121 (48) | A **fish school** gathers below the waterline. |
+| **121.0 (48.3)** | **The breach.** Fish leap the surface and become birds as they cross the waterline. The flock rises into the sky and stays there as a murmuration over the sunset. |
+| 122.5–133 (49–54) | **The march.** On the shore at golden hour, sun on the horizon at centre, a procession walks left to right toward it, silhouetted, each stage the lead walker in turn (`timeline.march`): tetrapod hauling out of the water (122.5), amphibian (124), reptile (125), **dinosaur** (126, a roar on the bar-51 downbeat, stomping on every beat), small mammal (128), ape (129), **early human** (130). Every footstep in `timeline.footsteps` is a foot planting at that instant, panned to `marchX(t)`. |
+| 132–133 | The human stops at the exact centre in front of the setting sun, raises a torch, and it **catches at 133.0**. |
+| 133–134 | Night falls. The human and the land sink into darkness; the torch flame remains, a small ember at the exact centre. |
 
-**Out → VII (133.0–135.0):** the setting sun's last glint *becomes* the ember of the first fire.
+**Out → VII (133.0–135.0):** the torch's flame, the first fire humans made, *becomes* the ember that the fire drawing grows from.
 
 ## VII · FIRE TO FIBER — 134.000 → 160.000 (bars 55–67, 120 BPM)
 

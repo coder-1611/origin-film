@@ -403,13 +403,15 @@ for (let bar = 41; bar <= 54; bar++) {
   const cell = [r, fifth, r + 12, third, fifth, r + 12, third, fifth];
   eighths().forEach((b, i) => {
     const n = N(bt(bar, b), 0.4, 'marimba', cell[i], (i % 2 ? 0.28 : 0.38) + 0.05 * R(), { x: (R() * 2 - 1) * 0.3 });
-    if (bar >= 45) leafFlushes.push({ t: n.t, midi: n.midi });
+    if (bar >= 45 && bar <= 47) leafFlushes.push({ t: n.t, midi: n.midi });   // the forest sprouts on the marimba
   });
   if (bar >= 45) drums(bar, { kick: [1, 2, 3, 4], hat: bar >= 47 ? [1.5, 2.5, 3.5, 4.5] : [], clap: bar >= 49 ? [2, 4] : [] }, 0.7);
 }
 for (let bar = 41; bar <= 44; bar++) {
   for (let k = 0; k < 3; k++) {
-    const t = bt(bar, 1 + k * 1.5 + (R() < 0.3 ? 0.5 : 0)), x = (R() * 2 - 1) * 0.6, y = (R() * 2 - 1) * 0.5;
+    // Same random draws as before (so every later event is unchanged), squeezed into 106–111.8 s.
+    const t0 = bt(bar, 1 + k * 1.5 + (R() < 0.3 ? 0.5 : 0)), x = (R() * 2 - 1) * 0.6, y = (R() * 2 - 1) * 0.5;
+    const t = bt(41) + (t0 - bt(41)) * 0.72;
     const ch = chordAt(t + 1e-3), midi = place(ch.pcs[Math.floor(R() * ch.pcs.length)], 81);
     cellDivisions.push({ t, x, y, midi });
     S(t, 0.25, 'pop', 0.45, x, { midi });
@@ -419,10 +421,55 @@ cellDivisions.sort((a, b) => a.t - b.t);
 for (const n of motif(45, 1, 65, 'major', 'marimba', 0.62)) leafFlushes.push({ t: n.t, midi: n.midi, motif: true });
 for (const n of motif(47, 1, 65, 'major', 'marimba', 0.62)) leafFlushes.push({ t: n.t, midi: n.midi, motif: true });
 leafFlushes.sort((a, b) => a.t - b.t);
-export const BREACH_T = bt(51);
-S(bt(50, 3), bt(51) - bt(50, 3), 'whoosh', 0.6, 0, { x1: 0 });
+export const BREACH_T = bt(48, 3);                                   // 121.0: fish → birds
+S(bt(48), BREACH_T - bt(48), 'whoosh', 0.6, 0, { x1: 0 });
 S(BREACH_T, 1.2, 'splash', 0.55, 0, { small: true });
 S(bt(54), barLen(54), 'riser', 0.7, 0);
+
+// ----- The march: evolution on the shore at sunset (122.5–133 s) --------------------------
+// One procession walks left → right toward the sun at screen centre. Each stage is the lead
+// walker from its t0 to the next stage's t0; marchX(t) is the lead walker's screen x (NDC),
+// and every footstep below is a foot planting at that moment (the walk cycle must plant on it).
+// The human stops at centre at bt(54) and raises a torch that catches at march.torch; its flame
+// is the ember that VII's fire grows from.
+export const footsteps = [];     // { t, stage, x, foot (0/1), weight }
+export const march = (() => {
+  const stages = [
+    { name: 'tetrapod',  t0: bt(49, 2), every: 1,    weight: 0.35, kind: 'slap' },
+    { name: 'amphibian', t0: bt(50),    every: 0.5,  weight: 0.25, kind: 'pad',     call: { type: 'croak', beat: 0.5 } },
+    { name: 'reptile',   t0: bt(50, 3), every: 0.25, weight: 0.16, kind: 'patter',  call: { type: 'hiss',  beat: 0.75 } },
+    { name: 'dinosaur',  t0: bt(51),    every: 1,    weight: 1.0,  kind: 'stomp',   call: { type: 'roar',  beat: 0 } },
+    { name: 'mammal',    t0: bt(52),    every: 0.5,  weight: 0.3,  kind: 'pad',     call: { type: 'chirp', beat: 0.5 } },
+    { name: 'ape',       t0: bt(52, 3), every: 0.5,  weight: 0.45, kind: 'knuckle', call: { type: 'hoot',  beat: 0.5 } },
+    { name: 'human',     t0: bt(53),    every: 1,    weight: 0.5,  kind: 'foot' },
+  ];
+  const standAt = bt(54), torch = bt(54, 3);
+  stages.forEach((s, i) => { s.t1 = i < stages.length - 1 ? stages[i + 1].t0 : standAt; });
+  return { t0: stages[0].t0, t1: bt(55), stages, standAt, torch,
+    path: [[stages[0].t0, -0.85], [standAt, 0.0], [bt(55), 0.0]] };
+})();
+export function marchX(t) { return pwl(march.path, t); }
+export function marchStage(t) { let k = 0; march.stages.forEach((s, i) => { if (t >= s.t0) k = i; }); return k; }
+{
+  const RM = mulberry32(0x3A6C);                                     // own stream: nothing else shifts
+  S(march.t0, 0.9, 'splash', 0.3, marchX(march.t0), { small: true }); // the tetrapod hauls out of the water
+  march.stages.forEach((st, si) => {
+    let foot = 0;
+    for (let b = beatAt(st.t0); ; b += st.every) {
+      const t = timeAtBeat(b);
+      if (t >= st.t1 - 1e-6) break;
+      const x = marchX(t);
+      footsteps.push({ t, stage: si, x, foot, weight: st.weight });
+      S(t, 0.25, 'step', st.weight * (0.85 + 0.3 * RM()), x, { kind: st.kind });
+      foot ^= 1;
+    }
+    if (st.call) {
+      const t = timeAtBeat(beatAt(st.t0) + st.call.beat);
+      S(t, st.call.type === 'roar' ? 1.6 : 0.6, 'call', st.call.type === 'roar' ? 0.9 : 0.55, marchX(t), { call: st.call.type });
+    }
+  });
+  S(march.torch, 1.4, 'ignite', 0.8, 0);
+}
 
 // ===== VII · FIRE TO FIBER (bars 55-67, 120 BPM) ===========================================
 // The frieze: line drawings laid out along one long scroll; the camera trucks right.
@@ -662,6 +709,7 @@ export const flashes = [
 export const storyBeats = [
   { t: 10.5, name: 'collapse to pinprick', dur: 0.25 },
   { t: bt(8), name: 'first star ignites', dur: 0.1 },
+  { t: bt(54, 3), name: 'the torch catches', dur: 0.3 },
 ];
 /** Exposure pulse per kick (fraction of exposure added at the hit), by chapter. */
 export const pulse = { I: 0, II: 0.22, III: 0.16, IV: 0.16, V: 0.12, VI: 0.12, VII: 0.13, VIII: 0.14, tau: 0.085 };
@@ -691,8 +739,10 @@ export const hud = {
   fadeOut: [174.0, 175.5],
   anchors: [
     [0, 13.8e9], [12, 13.8e9], [bt(5), 13.79962e9], [32, 13.6e9], [bt(12), 12.0e9], [58, 4.6e9],
-    [THEIA_T, 4.51e9], [bt(29), 4.4e9], [SPLASH_T, 3.9e9], [106, 3.8e9], [bt(45), 1.0e9],
-    [bt(49), 3.85e8], [BREACH_T, 1.5e8], [bt(54), 6.6e7], [134, 1.0e6], [bt(57), 5500],
+    [THEIA_T, 4.51e9], [bt(29), 4.4e9], [SPLASH_T, 3.9e9], [106, 3.8e9], [bt(45), 4.7e8],
+    [BREACH_T, 3.8e8], [march.stages[0].t0, 3.75e8], [march.stages[1].t0, 3.4e8], [march.stages[2].t0, 3.1e8],
+    [march.stages[3].t0, 2.3e8], [march.stages[4].t0, 6.6e7], [march.stages[5].t0, 2.0e7], [march.stages[6].t0, 2.0e6],
+    [march.torch, 1.05e6], [134, 1.0e6], [bt(57), 5500],
     [bt(59), 586], [bt(61), 250], [bt(63), 55], [bt(66, 3), 1], [typing.start, 1 / 365.25],
     [typing.times[typing.humanChars], 1 / 8766], [typing.last, 1 / 31557600],
   ],

@@ -579,6 +579,91 @@ export class ScoreEngine {
     nz.connect(bp); bp.connect(ng); ng.connect(g);
     this.route(g, this.sfxBus, { pan: e.x * 0.85, wet: 0.6 });
   }
+  // ---- VI: the march (footsteps, calls, the torch) ----------------------------------------
+  s_step(e, w) {
+    const c = this.ctx, g = c.createGain(), k = e.kind;
+    const P = {   // [noise filter type, freq, Q, noise decay, thump Hz from→to, thump decay, noise amp, thump amp]
+      slap:    ['bandpass', 900, 1.0, 0.04, 140, 90, 0.05, 0.5, 0.35],
+      pad:     ['lowpass', 520, 0.7, 0.03, 110, 80, 0.04, 0.35, 0.45],
+      patter:  ['bandpass', 2400, 1.5, 0.008, 300, 200, 0.01, 0.35, 0.05],
+      stomp:   ['lowpass', 320, 0.7, 0.12, 62, 34, 0.26, 0.6, 1.0],
+      knuckle: ['bandpass', 700, 1.0, 0.035, 120, 85, 0.05, 0.4, 0.5],
+      foot:    ['lowpass', 1300, 0.8, 0.06, 90, 70, 0.05, 0.45, 0.4],
+    }[k] || ['lowpass', 800, 0.7, 0.04, 100, 70, 0.05, 0.4, 0.4];
+    const nz = this.noiseSrc(w, 0.4, e.t * 53 + 7), f = c.createBiquadFilter(); f.type = P[0]; f.frequency.value = P[1]; f.Q.value = P[2];
+    const ng = c.createGain(); ng.gain.setValueAtTime(P[7] * e.vel, w); ng.gain.setTargetAtTime(0, w, P[3]);
+    nz.connect(f); f.connect(ng); ng.connect(g);
+    const o = this.osc('sine', P[4], w, w + P[6] * 6 + 0.05); o.frequency.exponentialRampToValueAtTime(P[5], w + P[6] * 2);
+    const og = c.createGain(); og.gain.setValueAtTime(0, w); og.gain.linearRampToValueAtTime(P[8] * e.vel, w + 0.003); og.gain.setTargetAtTime(0, w + 0.005, P[6]);
+    o.connect(og); og.connect(g);
+    this.route(g, this.sfxBus, { pan: e.x * 0.85, wet: k === 'stomp' ? 0.35 : 0.15 });
+  }
+  s_call(e, w) {
+    const c = this.ctx, g = c.createGain(), d = e.dur;
+    if (e.call === 'croak') {                       // amphibian: pulsed buzzy tone through a formant
+      const o = this.osc('sawtooth', 190, w, w + d + 0.1), am = this.osc('square', 28, w, w + d + 0.1), amg = c.createGain();
+      amg.gain.value = 0.5; am.connect(amg);
+      const vca = c.createGain(); vca.gain.value = 0.5; amg.connect(vca.gain); o.connect(vca);
+      const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 620; bp.Q.value = 3; vca.connect(bp); bp.connect(g);
+      o.frequency.setValueAtTime(200, w); o.frequency.linearRampToValueAtTime(170, w + d);
+      g.gain.setValueAtTime(0, w); g.gain.linearRampToValueAtTime(0.5 * e.vel, w + 0.03); g.gain.setTargetAtTime(0, w + d * 0.7, 0.05);
+    } else if (e.call === 'hiss') {                 // reptile
+      const nz = this.noiseSrc(w, d + 0.1, 311), hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3800;
+      nz.connect(hp); hp.connect(g);
+      g.gain.setValueAtTime(0, w); g.gain.linearRampToValueAtTime(0.28 * e.vel, w + 0.06); g.gain.setTargetAtTime(0, w + d * 0.6, 0.08);
+    } else if (e.call === 'roar') {                 // dinosaur: FM growl + formant-swept noise, big room
+      const o = this.osc('sawtooth', 78, w, w + d + 0.2), m = this.osc('sine', 23, w, w + d + 0.2), mg = c.createGain();
+      mg.gain.value = 30; m.connect(mg); mg.connect(o.frequency);
+      o.frequency.setValueAtTime(95, w); o.frequency.linearRampToValueAtTime(70, w + d);
+      const nz = this.noiseSrc(w, d + 0.2, 523), bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 2.5;
+      bp.frequency.setValueAtTime(350, w); bp.frequency.exponentialRampToValueAtTime(900, w + d * 0.4); bp.frequency.exponentialRampToValueAtTime(260, w + d);
+      const ng = c.createGain(); ng.gain.value = 1.4; nz.connect(bp); bp.connect(ng);
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400; o.connect(lp);
+      const mix = c.createGain(); lp.connect(mix); ng.connect(mix);
+      const sh = c.createWaveShaper(); const cv = new Float32Array(1024); for (let i = 0; i < 1024; i++) { const x = i / 511.5 - 1; cv[i] = Math.tanh(x * 2.5); } sh.curve = cv;
+      mix.connect(sh); sh.connect(g);
+      g.gain.setValueAtTime(0, w); g.gain.linearRampToValueAtTime(0.36 * e.vel, w + 0.12); g.gain.setTargetAtTime(0.22 * e.vel, w + 0.12, 0.3); g.gain.setTargetAtTime(0, w + d * 0.75, 0.12);
+    } else if (e.call === 'chirp') {                // small mammal: three quick rising chirps
+      for (let k = 0; k < 3; k++) {
+        const t0 = w + k * 0.09, o = this.osc('sine', 3600, t0, t0 + 0.07); o.frequency.exponentialRampToValueAtTime(5200, t0 + 0.05);
+        const cg = c.createGain(); cg.gain.setValueAtTime(0, t0); cg.gain.linearRampToValueAtTime(0.12 * e.vel, t0 + 0.005); cg.gain.setTargetAtTime(0, t0 + 0.02, 0.015);
+        o.connect(cg); cg.connect(g);
+      }
+      g.gain.value = 1;
+    } else if (e.call === 'hoot') {                 // ape: two breathy "hoo"s gliding up
+      for (let k = 0; k < 2; k++) {
+        const t0 = w + k * 0.24, o = this.osc('triangle', 360 + k * 60, t0, t0 + 0.26); o.frequency.exponentialRampToValueAtTime(520 + k * 80, t0 + 0.2);
+        const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 700; bp.Q.value = 1.2;
+        const nz = this.noiseSrc(t0, 0.26, 733 + k), nlp = c.createBiquadFilter(); nlp.type = 'bandpass'; nlp.frequency.value = 900; const ngn = c.createGain(); ngn.gain.value = 0.25;
+        nz.connect(nlp); nlp.connect(ngn);
+        const cg = c.createGain(); cg.gain.setValueAtTime(0, t0); cg.gain.linearRampToValueAtTime(0.3 * e.vel, t0 + 0.04); cg.gain.setTargetAtTime(0, t0 + 0.15, 0.04);
+        o.connect(bp); bp.connect(cg); ngn.connect(cg); cg.connect(g);
+      }
+      g.gain.value = 1;
+    }
+    this.route(g, this.sfxBus, { pan: e.x * 0.85, wet: e.call === 'roar' ? 0.7 : 0.35 });
+  }
+  s_ignite(e, w) {                                  // the torch catches: whoosh + its own crackle
+    const c = this.ctx;
+    const nz = this.noiseSrc(w, 0.6, 977), bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.3;
+    bp.frequency.setValueAtTime(260, w); bp.frequency.exponentialRampToValueAtTime(1900, w + 0.25); bp.frequency.exponentialRampToValueAtTime(700, w + 0.55);
+    const g = c.createGain(); g.gain.setValueAtTime(0, w); g.gain.linearRampToValueAtTime(0.45 * e.vel, w + 0.08); g.gain.setTargetAtTime(0, w + 0.25, 0.12);
+    nz.connect(bp); bp.connect(g);
+    this.route(g, this.sfxBus, { pan: e.x * 0.85, wet: 0.3 });
+    if (!this.buffers.ignite) {
+      const sr = this.sr, len = Math.floor(sr * e.dur), L = new Float32Array(len), R = new Float32Array(len), r = T.mulberry32(0x7043);
+      let t = 0.05;
+      while (t < e.dur) {
+        t += (0.3 + r() * 1.4) / (45 + 25 * r());
+        const at = Math.floor(t * sr), glen = Math.floor((0.0004 + r() * r() * 0.003) * sr), amp = (0.15 + r() * r() * 0.8) * Math.min(1, t / 0.2) * Math.max(0, 1 - t / e.dur);
+        const x = (r() - 0.5) * 0.12, gl = Math.cos((x + 1) * Math.PI / 4), gr = Math.sin((x + 1) * Math.PI / 4), tone = 0.15 + r() * 0.7;
+        let lp = 0;
+        for (let i = 0; i < glen && at + i < len; i++) { const wv = r() * 2 - 1; lp += tone * (wv - lp); const v = lp * Math.exp(-i / (glen * 0.3)) * amp; L[at + i] += v * gl; R[at + i] += v * gr; }
+      }
+      const b = c.createBuffer(2, len, sr); b.copyToChannel(L, 0); b.copyToChannel(R, 1); this.buffers.ignite = b;
+    }
+    const s = this.src(this.buffers.ignite, w), cg = c.createGain(); cg.gain.value = 0.5 * e.vel; s.connect(cg); cg.connect(this.sfxBus);
+  }
   bufferVoice(name, data, e, w, offset = 0) {
     if (!this.buffers[name]) {
       const b = this.ctx.createBuffer(2, data[0].length, this.sr); b.copyToChannel(data[0], 0); b.copyToChannel(data[1], 1);

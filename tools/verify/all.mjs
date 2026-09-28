@@ -56,10 +56,10 @@ ${master.trim()}
 ## Loop seam
 
 * Source frames \`f00000.jpg\` vs \`f10799.jpg\` byte-identical: **${loop.sourceFramesIdenticalBytes}**
-* Decoded MP4, first vs last of ${loop.mp4Frames} frames: mean |Δ| **${loop.mp4FirstVsLast.meanAbsDiff}**, max |Δ| **${loop.mp4FirstVsLast.maxAbsDiff}**, PSNR **${loop.mp4FirstVsLast.psnrDb} dB**
-  (any residual comes from H.264: frame 0 is an I-frame, the last frame is predicted).
-* Audio wrap (last sample → first sample), mastered WAV: jump **${loop.wavWrap.wrapJump}** vs median step ${loop.wavWrap.medianStep}, p99 step ${loop.wavWrap.p99Step} (the jump sits at the **${loop.wavWrap.wrapJumpPercentile}th percentile** of all steps).
-* Audio wrap, decoded AAC from the MP4: jump **${loop.mp4AudioWrap.wrapJump}** vs median ${loop.mp4AudioWrap.medianStep}, p99 ${loop.mp4AudioWrap.p99Step} (${loop.mp4AudioWrap.wrapJumpPercentile}th percentile).
+* Decoded MP4, first vs last of ${loop.mp4Frames} frames: mean |Δ| **${loop.mp4FirstVsLast.meanAbsDiff}**, max |Δ| **${loop.mp4FirstVsLast.maxAbsDiff}**, PSNR **${loop.mp4FirstVsLast.psnrDb === 'identical' ? '∞ (identical)' : loop.mp4FirstVsLast.psnrDb + ' dB'}**.
+  The encoder checks that the last source frame is byte-identical to frame 0, then reuses frame 0's own encoded IDR access unit as the last frame.
+* Audio at the wrap point (t = 180.000 → 0), mastered WAV: jump **${loop.wavWrap.wrapJump}** vs local median step ${loop.wavWrap.localMedianStep}, local p99 ${loop.wavWrap.localP99Step} (**${loop.wavWrap.wrapJumpLocalPercentile}th percentile** of the steps within ±0.5 s).
+* Audio at the wrap point, decoded AAC from the MP4: jump **${loop.mp4AudioWrap.wrapJump}** vs local median ${loop.mp4AudioWrap.localMedianStep}, local p99 ${loop.mp4AudioWrap.localP99Step} (**${loop.mp4AudioWrap.wrapJumpLocalPercentile}th percentile**). The AAC is encoded circularly padded (so both edges of the loop are coded with their true neighbours and the decoder has real pre-roll), and the MP4 edit list presents exactly 180.000 s. The decoder output past sample 8,640,000 is the tail of the last AAC frame, outside the presented range.
 
 ## Hard cuts
 

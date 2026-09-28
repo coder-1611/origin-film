@@ -20,14 +20,18 @@ const f0 = grab('eq(n\\,0)'), fl = grab(`eq(n\\,${nb - 1})`);
 let sad = 0, mx = 0, se = 0;
 for (let i = 0; i < f0.length; i++) { const d = Math.abs(f0[i] - fl[i]); sad += d; mx = Math.max(mx, d); se += d * d; }
 res.mp4Frames = nb;
-res.mp4FirstVsLast = { meanAbsDiff: +(sad / f0.length).toFixed(4), maxAbsDiff: mx, psnrDb: se === 0 ? Infinity : +(10 * Math.log10(255 * 255 / (se / f0.length))).toFixed(2) };
-function wrap(inter) {
-  const n = inter.length / 2, steps = [];
-  for (let i = 1; i < n; i++) steps.push(Math.max(Math.abs(inter[2 * i] - inter[2 * i - 2]), Math.abs(inter[2 * i + 1] - inter[2 * i - 1])));
+res.mp4FirstVsLast = { meanAbsDiff: +(sad / f0.length).toFixed(4), maxAbsDiff: mx, psnrDb: se === 0 ? 'identical' : +(10 * Math.log10(255 * 255 / (se / f0.length))).toFixed(2) };
+// Continuity at the true wrap point (t = 180.000, where the video loops): the jump from the
+// sample just before 180 s to sample 0, against the step statistics of the 0.5 s either side.
+function wrap(inter, sr = 48000) {
+  const N = 180 * sr, W = sr / 2, steps = [];
+  const step = (i, j) => Math.max(Math.abs(inter[2 * i] - inter[2 * j]), Math.abs(inter[2 * i + 1] - inter[2 * j + 1]));
+  for (let i = N - W; i < N; i++) steps.push(step(i, i - 1));
+  for (let i = 1; i < W; i++) steps.push(step(i, i - 1));
   steps.sort((a, b) => a - b);
-  const jump = Math.max(Math.abs(inter[0] - inter[2 * n - 2]), Math.abs(inter[1] - inter[2 * n - 1]));
-  const rank = steps.findIndex(s => s >= jump) / steps.length;
-  return { wrapJump: +jump.toFixed(5), medianStep: +steps[steps.length >> 1].toFixed(5), p99Step: +steps[Math.floor(steps.length * 0.99)].toFixed(5), wrapJumpPercentile: +(100 * (rank < 0 ? 1 : rank)).toFixed(1) };
+  const jump = step(0, N - 1);
+  const rank = steps.findIndex(s => s >= jump);
+  return { samplesDecoded: inter.length / 2, wrapJump: +jump.toFixed(5), localMedianStep: +steps[steps.length >> 1].toFixed(5), localP99Step: +steps[Math.floor(steps.length * 0.99)].toFixed(5), wrapJumpLocalPercentile: +(100 * (rank < 0 ? 1 : rank / steps.length)).toFixed(1) };
 }
 res.wavWrap = wrap(readWav(path.join(ROOT, 'renders/score.wav')).inter);
 res.mp4AudioWrap = wrap(await decodeAudio(file));

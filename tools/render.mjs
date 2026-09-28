@@ -56,14 +56,42 @@ if (!opt('no-encode', false)) {
   if (missing.length) { console.log(`not encoding: ${missing.length} frames missing (first ${missing[0]})`); process.exit(0); }
   const wav = path.join(ROOT, 'renders/score.wav');
   const out = path.join(ROOT, 'renders', outName);
-  const args = ['-y', '-v', 'error', '-framerate', String(FPS), '-i', path.join(dir, 'f%05d.jpg'), '-i', wav,
-    '-map', '0:v', '-map', '1:a',
-    '-vf', 'scale=in_range=full:out_range=tv:in_color_matrix=bt601:out_color_matrix=bt709,format=yuv420p',
+  const tmp = (n) => path.join(ROOT, 'renders', `.${path.basename(outName, '.mp4')}.${n}`);
+  const ff = (args) => { const r = spawnSync('ffmpeg', ['-y', '-v', 'error', ...args], { stdio: 'inherit' }); if (r.status !== 0) process.exit(r.status); };
+  const VIDEO = ['-vf', 'scale=in_range=full:out_range=tv:in_color_matrix=bt601:out_color_matrix=bt709,format=yuv420p',
     '-c:v', 'libx264', '-preset', draft ? 'medium' : 'slow', '-crf', '16', '-pix_fmt', 'yuv420p',
-    '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
-    '-c:a', 'aac', '-b:a', '320k', '-ar', '48000', '-t', '180', '-movflags', '+faststart', out];
-  console.log('encoding →', path.relative(ROOT, out));
-  const r = spawnSync('ffmpeg', args, { stdio: 'inherit' });
-  if (r.status !== 0) process.exit(r.status);
+    '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv'];
+  // The loop: the last source frame is byte-identical to frame 0 (it IS frame 0, by design).
+  // So encode frames 0…N-2 once and append frame 0's own encoded IDR access unit as frame N-1:
+  // the decoded last frame is then bit-identical to the decoded first frame.
+  const loopExact = fs.readFileSync(fname(TOTAL - 1)).equals(fs.readFileSync(fname(0)));
+  console.log('encoding →', path.relative(ROOT, out), loopExact ? '(last frame = frame 0: splicing its IDR)' : '(last frame differs from frame 0: plain encode)');
+  let video;
+  if (loopExact) {
+    ff(['-framerate', String(FPS), '-i', path.join(dir, 'f%05d.jpg'), '-frames:v', String(TOTAL - 1), ...VIDEO, '-an', tmp('main.mp4')]);
+    ff(['-i', tmp('main.mp4'), '-frames:v', '1', '-c', 'copy', tmp('first.mp4')]);
+    fs.writeFileSync(tmp('cat.txt'), `file '${tmp('main.mp4')}'\nfile '${tmp('first.mp4')}'\n`);
+    ff(['-f', 'concat', '-safe', '0', '-i', tmp('cat.txt'), '-c', 'copy', tmp('video.mp4')]);
+    video = tmp('video.mp4');
+  } else {
+    ff(['-framerate', String(FPS), '-i', path.join(dir, 'f%05d.jpg'), ...VIDEO, '-an', tmp('video.mp4')]);
+    video = tmp('video.mp4');
+  }
+  // Gapless audio loop. AAC starts cold (priming) and pads its last frame, both of which would
+  // click at the wrap. So the score is encoded circularly padded (1 s of its ending before it,
+  // 1 s of its opening after it), every packet is kept (the decoder gets real pre-roll), and the
+  // MP4 edit list is rewritten to present exactly samples [0, 180 s) of the film: container,
+  // video and audio durations are all exactly 180.000 s.
+  const { readWav, writeWavF32 } = await import('./lib/dsp.mjs');
+  const { setGaplessEdit } = await import('./lib/mp4-edit.mjs');
+  const { inter, sr } = readWav(wav), n = inter.length / 2, P = sr;
+  const ext = new Float32Array((n + 2 * P) * 2);
+  ext.set(inter.subarray((n - P) * 2), 0); ext.set(inter, P * 2); ext.set(inter.subarray(0, P * 2), (n + P) * 2);
+  writeWavF32(tmp('ext.wav'), ext, sr);
+  ff(['-i', tmp('ext.wav'), '-c:a', 'aac', '-b:a', '320k', '-ar', String(sr), tmp('ext.m4a')]);
+  ff(['-i', video, '-i', tmp('ext.m4a'), '-map', '0:v', '-map', '1:a', '-c', 'copy', '-movflags', '+faststart', out]);
+  const edit = setGaplessEdit(out, { addSkip: P, samples: n, mediaRate: sr });
+  console.log('gapless edit list:', JSON.stringify(edit));
+  for (const f of ['main.mp4', 'first.mp4', 'cat.txt', 'video.mp4', 'ext.wav', 'ext.m4a', 'audio.m4a']) fs.rmSync(tmp(f), { force: true });
   console.log('done:', path.relative(ROOT, out), (fs.statSync(out).size / 1e6).toFixed(1), 'MB');
 }

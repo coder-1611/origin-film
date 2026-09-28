@@ -110,20 +110,35 @@ export class ScreenUI {
       const v = tgt(i);
       if (v !== prev) { ev.push({ t: i === 0 ? this.T.typing.start : this.T.typing.times[i - 1], d: v - prev }); prev = v; }
     }
+    // glide width per scroll step: 0.3 s at typing speeds, narrowing as lines stream past (≈3 line
+    // periods) so the view never falls behind the caret when typing stops dead at ~110 lines/s
+    for (let j = 0; j < ev.length; j++) {
+      const a = ev[Math.max(0, j - 2)].t, b = ev[Math.min(ev.length - 1, j + 2)].t;
+      const span = Math.min(ev.length - 1, j + 2) - Math.max(0, j - 2);
+      const rate = span > 0 ? span / Math.max(1e-4, b - a) : 1;
+      ev[j].w = Math.min(0.3, Math.max(0.045, 3 / rate));
+    }
     Object.assign(this, { cls, vis, vline, vcol, cLine, cCol, lnNo, colNo, scrollEv: ev, keep, nChars: n, totalLines: L });
   }
 
+  /**
+   * Scroll (in lines) as a smooth, pure function of t. Every change of the scroll target (the caret
+   * moving onto a new line) glides through a smootherstep CENTRED on its keystroke (0.3 s wide at
+   * typing speed, narrower as lines stream by): the view eases a little before the line breaks and
+   * settles a little after, so it never lags the caret (at 7,000 cps the glides overlap into one
+   * even stream).
+   */
   scrollAt(t, count) {
-    const tau = 0.075;
     let s = 0;
     for (const e of this.scrollEv) {
-      if (e.t > t) break;
-      const x = (t - e.t) / tau;
-      s += e.d * (1 - (1 + x) * Math.exp(-x));
+      if (e.t - e.w * 0.5 > t + 0.3) break;
+      const u = (t - e.t) / e.w + 0.5;
+      if (u <= 0) continue;
+      s += e.d * (u >= 1 ? 1 : u * u * u * (u * (u * 6 - 15) + 10));
     }
     const line = this.cLine[count];
     const vis = Math.floor(ED.visLines);
-    return Math.max(0, Math.min(Math.max(s, line - vis + 1.35), line - 0.2));
+    return Math.max(0, Math.min(Math.max(s, line - vis + 1.05), line - 0.2));   // safety only
   }
 
   // ------------------------------------------------------------ public: state + draw

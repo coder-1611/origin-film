@@ -23,9 +23,15 @@ ritardando to 60 BPM (168 → 176 s), then free time. Chapter boundaries are dow
 | VIII | THE PROMPT | 160.000 | 180.000 | 68–74 + free | UI compositing + real recursive feedback (Droste) |
 
 **No hard cuts.** Every hand-off is a match-move, a scale dissolve, or an object becoming
-the next scene's object. The only sanctioned single-frame luminance spikes are the
-**flash events** (Big Bang 12.000, Theia impact 69.367, splash 102.000, Enter 168.000)
-and the kick exposure pulses. `tools/verify/cuts.mjs` checks this.
+the next scene's object. A single-frame jump is allowed only on a storyboarded beat, and
+all of them are data in `timeline.js`:
+- the **flash events**: Big Bang 12.000, Theia impact 69.367, splash 102.000, Enter 168.000;
+- the **story beats**: the collapse to a pinprick at 10.5 and the first star at 32.000;
+- the **star births** in III, each a flash;
+- the **kick exposure pulses**.
+
+`tools/verify/cuts.mjs` checks the delivered MP4 for isolated jumps, A→B→A dropouts and
+hand-off windows.
 
 **HUD.** Present from 1.0 s (fade in to 2.5 s) until 174 s (fade out by 175.5 s). Bottom-left:
 a thin rule, the chapter label (`II · INFLATION`), and the year counter in JetBrains Mono,
@@ -50,8 +56,10 @@ Camera: slow dolly toward the point, 0 → 10.5 s, accelerating slightly in the 
 | 10.5 | **Silence.** The point collapses to a pinprick over 0.25 s (a visual inhale), and the foam vanishes. |
 | 10.5–12.0 | Black and a trembling pinprick, 1.5 s of digital silence. |
 
-**Out → II (11.90–12.20):** the pinprick *is* the origin of the explosion. At 12.000 the
-particles erupt from the exact centre pixel, and the pinprick fades under the flash.
+**Out → II (11.96–12.00):** the pinprick *is* the origin of the explosion. It fades over the
+last 2 frames, and at exactly 12.000, on the downbeat and the impact, a white-hot core fills
+the frame. 12.000 and 12.017 are the two brightest frames of the chapter. Inflation completes in
+~0.02 s, and plasma structure reads by ~12.12.
 
 ## II · INFLATION — 12.000 → 32.000 (bars 1–7, 84 BPM)
 
@@ -60,7 +68,7 @@ into III.
 
 | t | Beat |
 |---|---|
-| 12.000 (1.1) | **BANG.** Sanctioned flash: white for ~2 frames, decaying over 0.4 s. 250k particles inflate exponentially (0.35 s), then decelerate. A shockwave ring. |
+| 12.000 (1.1) | **BANG.** Sanctioned flash: white-hot for exactly 2 frames (12.000, 12.017), decaying over 0.3 s. 1,048,576 particles inflate ×10⁴ in 0.022 s, then decelerate. A shockwave ring. |
 | 12–20.6 (1–3) | Quark-gluon plasma: white-blue, turbulent curl noise, colour = blackbody temperature. Kicks on beats 1 and 3 (from bar 2) punch the turbulence. |
 | 20.6–26.3 (4–5) | Cooling: yellow → orange. At bar 5 (23.43) comes recombination, "first light passes through": the fog opacity drops and the plasma turns transparent. |
 | 26.3–32 (6–7) | Dark ages: deep red embers drift into filaments, a cosmic web, and the camera flies through it. Bar 7 is an A7sus chord, tension. |
@@ -130,7 +138,9 @@ inside it.
 ## VII · FIRE TO FIBER — 134.000 → 160.000 (bars 55–67, 120 BPM)
 
 Glowing amber line-art on warm black: SVG path data drawn on with animated dash offsets.
-The camera trucks right along one continuous frieze. The supersaw anthem plays.
+The camera trucks right along one continuous frieze. It holds on each plate while that plate
+draws and animates, and glides to the next between them (`timeline.frieze.truck`). The supersaw
+anthem plays.
 
 | t | Beat |
 |---|---|

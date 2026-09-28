@@ -11,8 +11,8 @@
 import { PROMPT } from './assets/prompt.js';
 
 export const FPS = 60;
-export const DURATION = 180;
-export const FRAMES = FPS * DURATION;         // 10,800. Frame n shows t = n / FPS.
+export const DURATION = 200;                  // 3:20 (VI's evolution got 20 s more)
+export const FRAMES = FPS * DURATION;         // 12,000. Frame n shows t = n / FPS.
 export const W = 1920, H = 1080;
 export const SAMPLE_RATE = 48000;
 export const AUDIO_TAIL = 6;                  // audio renders to 186 s; the tail folds onto 0 s
@@ -46,11 +46,11 @@ export const tempo = {
   segments: [
     { t0: 12,             t1: 33.3508893593, bpm0: 84,  bpm1: 84 },
     { t0: 33.3508893593,  t1: 83.9824439740, bpm0: 84,  bpm1: 120 },
-    { t0: 83.9824439740,  t1: 168,           bpm0: 120, bpm1: 120 },
-    { t0: 168,            t1: 176,           bpm0: 120, bpm1: 60 },
+    { t0: 83.9824439740,  t1: 188,           bpm0: 120, bpm1: 120 },
+    { t0: 188,            t1: 196,           bpm0: 120, bpm1: 60 },
   ],
   freeUntil: 12,
-  freeFrom: 176,
+  freeFrom: 196,
 };
 for (const s of tempo.segments) {
   s.D = s.t1 - s.t0;
@@ -111,9 +111,9 @@ export const chapters = [
   { id: 'III',  name: 'FIRST LIGHT',   start: bt(8),   end: bt(18) },
   { id: 'IV',   name: 'ACCRETION',     start: bt(18),  end: bt(29) },
   { id: 'V',    name: 'PALE BLUE',     start: bt(29),  end: bt(41) },
-  { id: 'VI',   name: 'LIFE',          start: bt(41),  end: bt(55) },
-  { id: 'VII',  name: 'FIRE TO FIBER', start: bt(55),  end: bt(68) },
-  { id: 'VIII', name: 'THE PROMPT',    start: bt(68),  end: DURATION },
+  { id: 'VI',   name: 'LIFE',          start: bt(41),  end: bt(65) },
+  { id: 'VII',  name: 'FIRE TO FIBER', start: bt(65),  end: bt(78) },
+  { id: 'VIII', name: 'THE PROMPT',    start: bt(78),  end: DURATION },
 ];
 for (const c of chapters) c.label = `${c.id} · ${c.name}`;
 export const chapterById = Object.fromEntries(chapters.map(c => [c.id, c]));
@@ -127,8 +127,8 @@ export const transitions = [
   { from: 'III', to: 'IV',   a: 57.2,  b: 58.6 },
   { from: 'IV',  to: 'V',    a: 81.0,  b: 83.0 },
   { from: 'V',   to: 'VI',   a: 105.0, b: 107.0 },
-  { from: 'VI',  to: 'VII',  a: 133.0, b: 135.0 },
-  { from: 'VII', to: 'VIII', a: 159.2, b: 160.6 },
+  { from: 'VI',  to: 'VII',  a: 153.0, b: 155.0 },
+  { from: 'VII', to: 'VIII', a: 179.2, b: 180.6 },
 ];
 export function smootherstep(e0, e1, x) {
   const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
@@ -186,9 +186,13 @@ export const chart = {
   8: 'Dm9', 9: 'Dm', 10: 'Bbmaj7', 11: 'Bb', 12: 'Gm9', 13: 'Gm', 14: 'Dm/F', 15: 'Bb', 16: 'C', 17: 'A',
   18: 'Dm', 19: 'Dm', 20: 'Bb', 21: 'C', 22: 'A', 23: 'Dm', 24: 'Bb', 25: 'Gm', 26: 'Dm', 27: 'C', 28: 'C7',
   29: 'F', 30: 'C/E', 31: 'Dm', 32: 'Bb', 33: 'F', 34: 'C', 35: 'Bb', 36: 'Bb', 37: 'Gm', 38: 'C', 39: 'F', 40: 'F',
-  41: 'F', 42: 'Am', 43: 'Bb', 44: 'C', 45: 'F', 46: 'Am', 47: 'Bb', 48: 'C', 49: 'Dm', 50: 'Bb', 51: 'F', 52: 'C', 53: 'Bb', 54: 'C',
-  55: 'F', 56: 'C', 57: 'Dm', 58: 'Bb', 59: 'F', 60: 'C', 61: 'Bb', 62: 'C', 63: 'Dm', 64: 'Bb', 65: 'F/A', 66: 'Gm', 67: 'C',
-  68: 'Bb', 69: 'Gm', 70: 'Bb', 71: 'A', 72: 'Dm', 73: 'Bb', 74: ['Gm', 3, 'A'],
+  // VI (41-64): cells, forest, the breach (51), the march (52-62), the torch (63), nightfall (64)
+  41: 'F', 42: 'Am', 43: 'Bb', 44: 'C', 45: 'F', 46: 'Am', 47: 'Bb', 48: 'C', 49: 'Dm', 50: 'Bb', 51: 'F', 52: 'C',
+  53: 'Dm', 54: 'Bb', 55: 'F', 56: 'C', 57: 'Dm', 58: 'Bb', 59: 'F', 60: 'C', 61: 'Dm', 62: 'Gm', 63: 'Bb', 64: 'C',
+  // VII (65-77)
+  65: 'F', 66: 'C', 67: 'Dm', 68: 'Bb', 69: 'F', 70: 'C', 71: 'Bb', 72: 'C', 73: 'Dm', 74: 'Bb', 75: 'F/A', 76: 'Gm', 77: 'C',
+  // VIII (78-84)
+  78: 'Bb', 79: 'Gm', 80: 'Bb', 81: 'A', 82: 'Dm', 83: 'Bb', 84: ['Gm', 3, 'A'],
 };
 export function chordNameAt(t) {
   const bb = barBeat(t);
@@ -202,7 +206,7 @@ export function chordAt(t) { const n = chordNameAt(t); return { name: n, ...CHOR
 export const keyChanges = [
   { t: 0, key: 'D minor', tonic: 2 },
   { t: bt(29), key: 'F major', tonic: 5 },
-  { t: bt(68), key: 'D minor', tonic: 2 },
+  { t: bt(78), key: 'D minor', tonic: 2 },
 ];
 export function keyAt(t) { let k = keyChanges[0]; for (const c of keyChanges) if (t >= c.t) k = c; return k; }
 
@@ -260,11 +264,11 @@ function subBar(bar, vel, pattern = [1], near = 38, len = null) {
     N(t, len ? beatsToSec(t, len) : beatsToSec(t, 4 - (b - 1)) * 0.98, 'sub', bassNote(CHORDS[name], near), vel);
   }
 }
-function drums(bar, { kick = [], snare = [], clap = [], hat = [], ohat = [] }, vel = 1) {
+function drums(bar, { kick = [], snare = [], clap = [], hat = [], ohat = [] }, vel = 1, rng = R) {
   for (const b of kick)  N(bt(bar, b), 0.5, 'kick', 36, vel);
   for (const b of snare) N(bt(bar, b), 0.3, 'snare', 38, 0.8 * vel);
   for (const b of clap)  N(bt(bar, b), 0.3, 'clap', 39, 0.7 * vel);
-  for (const b of hat)   N(bt(bar, b), 0.06, 'hat', 42, (0.28 + 0.1 * R()) * vel);
+  for (const b of hat)   N(bt(bar, b), 0.06, 'hat', 42, (0.28 + 0.1 * rng()) * vel);
   for (const b of ohat)  N(bt(bar, b), 0.3, 'ohat', 46, 0.3 * vel);
 }
 function motif(bar, beat, tonicMidi, mode, inst, vel, extra = {}, beatScale = 1) {
@@ -393,8 +397,11 @@ for (let k = 0; k < 16; k++) {
   S(t, 0.12, 'bubble', 0.3 + 0.25 * R(), x, { midi });
 }
 
-// ===== VI · LIFE (bars 41-54, 120 BPM) =====================================================
-for (let bar = 41; bar <= 54; bar++) {
+// ===== VI · LIFE (bars 41-64, 120 BPM) =====================================================
+// cells 41-43 · surfacing 44 · forest 45-49 · the breach 51 · the march 52-62 · torch 63 · night 64
+const R6 = mulberry32(0x6E6F);   // stream for bars 55-64, so every later event keeps its draws
+for (let bar = 41; bar <= 64; bar++) {
+  const rr = bar <= 54 ? R : R6;
   padBar(bar, 0.3, 57, 81);
   subBar(bar, 0.55, bar >= 45 ? [1, 3] : [1], 41);
   // Marimba ostinato: root-5th-octave-3rd cell.
@@ -402,10 +409,15 @@ for (let bar = 41; bar <= 54; bar++) {
   const r = place(ch.bass === 4 ? 0 : ch.pcs[0], 60), fifth = place(ch.pcs[2] ?? ch.pcs[1], r + 7), third = place(ch.pcs[1], r + 16);
   const cell = [r, fifth, r + 12, third, fifth, r + 12, third, fifth];
   eighths().forEach((b, i) => {
-    const n = N(bt(bar, b), 0.4, 'marimba', cell[i], (i % 2 ? 0.28 : 0.38) + 0.05 * R(), { x: (R() * 2 - 1) * 0.3 });
-    if (bar >= 45 && bar <= 47) leafFlushes.push({ t: n.t, midi: n.midi });   // the forest sprouts on the marimba
+    const n = N(bt(bar, b), 0.4, 'marimba', cell[i], (i % 2 ? 0.28 : 0.38) + 0.05 * rr(), { x: (rr() * 2 - 1) * 0.3 });
+    if (bar >= 45 && bar <= 49) leafFlushes.push({ t: n.t, midi: n.midi });   // the forest sprouts on the marimba
   });
-  if (bar >= 45) drums(bar, { kick: [1, 2, 3, 4], hat: bar >= 47 ? [1.5, 2.5, 3.5, 4.5] : [], clap: bar >= 49 ? [2, 4] : [] }, 0.7);
+  if (bar >= 45 && bar <= 54) drums(bar, { kick: [1, 2, 3, 4], hat: bar >= 47 ? [1.5, 2.5, 3.5, 4.5] : [], clap: bar >= 49 ? [2, 4] : [] }, 0.7);
+  // The march (55-62) keeps the groove, the dinosaur's bars (57-58) hit hardest; the torch
+  // and nightfall (63-64) thin out to the kick so the riser can carry into VII.
+  if (bar >= 55 && bar <= 62) drums(bar, { kick: [1, 2, 3, 4], hat: [1.5, 2.5, 3.5, 4.5], clap: bar >= 57 ? [2, 4] : [] }, bar === 57 || bar === 58 ? 0.8 : 0.7, R6);
+  if (bar === 63) drums(bar, { kick: [1, 3] }, 0.6, R6);
+  if (bar === 64) drums(bar, { kick: [1] }, 0.5, R6);
 }
 for (let bar = 41; bar <= 44; bar++) {
   for (let k = 0; k < 3; k++) {
@@ -421,32 +433,33 @@ cellDivisions.sort((a, b) => a.t - b.t);
 for (const n of motif(45, 1, 65, 'major', 'marimba', 0.62)) leafFlushes.push({ t: n.t, midi: n.midi, motif: true });
 for (const n of motif(47, 1, 65, 'major', 'marimba', 0.62)) leafFlushes.push({ t: n.t, midi: n.midi, motif: true });
 leafFlushes.sort((a, b) => a.t - b.t);
-export const BREACH_T = bt(48, 3);                                   // 121.0: fish → birds
-S(bt(48), BREACH_T - bt(48), 'whoosh', 0.6, 0, { x1: 0 });
+motif(59, 1, 65, 'major', 'marimba', 0.5);                          // the motif returns as mammals arrive
+export const BREACH_T = bt(51);                                      // 126.0: fish → birds
+S(bt(50, 3), BREACH_T - bt(50, 3), 'whoosh', 0.6, 0, { x1: 0 });
 S(BREACH_T, 1.2, 'splash', 0.55, 0, { small: true });
-S(bt(54), barLen(54), 'riser', 0.7, 0);
+S(bt(64), barLen(64), 'riser', 0.7, 0);
 
-// ----- The march: evolution on the shore at sunset (122.5–133 s) --------------------------
+// ----- The march: evolution on the shore at sunset (128–150 s) ----------------------------
 // One procession walks left → right toward the sun at screen centre. Each stage is the lead
 // walker from its t0 to the next stage's t0; marchX(t) is the lead walker's screen x (NDC),
 // and every footstep below is a foot planting at that moment (the walk cycle must plant on it).
-// The human stops at centre at bt(54) and raises a torch that catches at march.torch; its flame
-// is the ember that VII's fire grows from.
+// The human stops at centre at march.standAt and raises a torch that catches at march.torch;
+// its flame is the ember that VII's fire grows from.
 export const footsteps = [];     // { t, stage, x, foot (0/1), weight }
 export const march = (() => {
   const stages = [
-    { name: 'tetrapod',  t0: bt(49, 2), every: 1,    weight: 0.35, kind: 'slap' },
-    { name: 'amphibian', t0: bt(50),    every: 0.5,  weight: 0.25, kind: 'pad',     call: { type: 'croak', beat: 0.5 } },
-    { name: 'reptile',   t0: bt(50, 3), every: 0.25, weight: 0.16, kind: 'patter',  call: { type: 'hiss',  beat: 0.75 } },
-    { name: 'dinosaur',  t0: bt(51),    every: 1,    weight: 1.0,  kind: 'stomp',   call: { type: 'roar',  beat: 0 } },
-    { name: 'mammal',    t0: bt(52),    every: 0.5,  weight: 0.3,  kind: 'pad',     call: { type: 'chirp', beat: 0.5 } },
-    { name: 'ape',       t0: bt(52, 3), every: 0.5,  weight: 0.45, kind: 'knuckle', call: { type: 'hoot',  beat: 0.5 } },
-    { name: 'human',     t0: bt(53),    every: 1,    weight: 0.5,  kind: 'foot' },
+    { name: 'tetrapod',  t0: bt(52),    every: 1,    weight: 0.35, kind: 'slap' },
+    { name: 'amphibian', t0: bt(53, 3), every: 0.5,  weight: 0.25, kind: 'pad',     call: { type: 'croak', beat: 1 } },
+    { name: 'reptile',   t0: bt(55),    every: 0.25, weight: 0.16, kind: 'patter',  call: { type: 'hiss',  beat: 1.5 } },
+    { name: 'dinosaur',  t0: bt(57),    every: 1,    weight: 1.0,  kind: 'stomp',   call: { type: 'roar',  beat: 0 } },
+    { name: 'mammal',    t0: bt(59),    every: 0.5,  weight: 0.3,  kind: 'pad',     call: { type: 'chirp', beat: 1 } },
+    { name: 'ape',       t0: bt(60, 3), every: 0.5,  weight: 0.45, kind: 'knuckle', call: { type: 'hoot',  beat: 1 } },
+    { name: 'human',     t0: bt(62),    every: 1,    weight: 0.5,  kind: 'foot' },
   ];
-  const standAt = bt(54), torch = bt(54, 3);
+  const standAt = bt(63), torch = bt(63, 3);
   stages.forEach((s, i) => { s.t1 = i < stages.length - 1 ? stages[i + 1].t0 : standAt; });
-  return { t0: stages[0].t0, t1: bt(55), stages, standAt, torch,
-    path: [[stages[0].t0, -0.85], [standAt, 0.0], [bt(55), 0.0]] };
+  return { t0: stages[0].t0, t1: bt(65), stages, standAt, torch,
+    path: [[stages[0].t0, -0.85], [standAt, 0.0], [bt(65), 0.0]] };
 })();
 export function marchX(t) { return pwl(march.path, t); }
 export function marchStage(t) { let k = 0; march.stages.forEach((s, i) => { if (t >= s.t0) k = i; }); return k; }
@@ -468,52 +481,54 @@ export function marchStage(t) { let k = 0; march.stages.forEach((s, i) => { if (
       S(t, st.call.type === 'roar' ? 1.6 : 0.6, 'call', st.call.type === 'roar' ? 0.9 : 0.55, marchX(t), { call: st.call.type });
     }
   });
+  // The dinosaur roars twice: on its downbeat and again as it turns toward the sun.
+  S(bt(58), 1.4, 'call', 0.75, marchX(bt(58)), { call: 'roar' });
   S(march.torch, 1.4, 'ignite', 0.8, 0);
 }
 
-// ===== VII · FIRE TO FIBER (bars 55-67, 120 BPM) ===========================================
+// ===== VII · FIRE TO FIBER (bars 65-77, 120 BPM) ===========================================
 // The frieze: line drawings laid out along one long scroll; the camera trucks right.
 // friezeX(wx, t) gives the NDC x of frieze-space x `wx` at time t; SFX pan by it.
 export const frieze = {
   items: [
-    { name: 'fire',   wx: 0.0, t0: bt(55), t1: bt(57) },
-    { name: 'wheel',  wx: 2.0, t0: bt(57), t1: bt(59) },
-    { name: 'press',  wx: 4.0, t0: bt(59), t1: bt(61) },
-    { name: 'engine', wx: 6.0, t0: bt(61), t1: bt(63) },
+    { name: 'fire',   wx: 0.0, t0: bt(65), t1: bt(67) },
+    { name: 'wheel',  wx: 2.0, t0: bt(67), t1: bt(69) },
+    { name: 'press',  wx: 4.0, t0: bt(69), t1: bt(71) },
+    { name: 'engine', wx: 6.0, t0: bt(71), t1: bt(73) },
   ],
   // camera truck (frieze units; 2 units = one screen width): hold on each plate while it is
-  // drawn and animated, glide to the next between them (clanks 142–145, hisses from 146).
-  truck: [[bt(55), 0.0], [136.2, 0.0], [137.6, 2.0], [140.4, 2.0], [141.6, 4.0], [145.2, 4.0], [146.0, 6.0], [bt(63), 6.2]],
+  // drawn and animated, glide to the next between them (clanks 162–165, hisses from 166).
+  truck: [[bt(65), 0.0], [156.2, 0.0], [157.6, 2.0], [160.4, 2.0], [161.6, 4.0], [165.2, 4.0], [166.0, 6.0], [bt(73), 6.2]],
 };
 export function friezeCamX(t) { return pwl(frieze.truck, t); }
 export function friezeX(wx, t) { return wx - friezeCamX(t); }
 
-for (let bar = 55; bar <= 67; bar++) {
+for (let bar = 65; bar <= 77; bar++) {
   padBar(bar, 0.46, 55, 79);
   subBar(bar, 0.8, eighths(), 38, 0.45);
-  if (bar <= 66) drums(bar, { kick: [1, 2, 3, 4], clap: [2, 4], hat: sixteenths(), ohat: [1.5, 2.5, 3.5, 4.5] }, 1.0);
+  if (bar <= 76) drums(bar, { kick: [1, 2, 3, 4], clap: [2, 4], hat: sixteenths(), ohat: [1.5, 2.5, 3.5, 4.5] }, 1.0);
 }
-drums(67, { kick: [1, 2, 3], snare: sixteenths(3, 4.75) }, 0.9);
+drums(77, { kick: [1, 2, 3], snare: sixteenths(3, 4.75) }, 0.9);
 {
   const L = 'lead';
-  motif(55, 1, 65, 'major', L, 0.7);                                  // F C Bb A G
-  [[57, 1, 74], [57, 2, 72], [57, 3, 70], [57, 4, 69]].forEach(([b, be, m]) => N(bt(b, be), beatsToSec(bt(b, be), 1), L, m, 0.62));
-  N(bt(58), beatsToSec(bt(58), 4), L, 70, 0.6);
-  for (const n of motif(59, 1, 65, 'major', L, 0.72)) N(n.t, n.dur, L, n.midi + (n.midi % 12 === 5 || n.midi % 12 === 0 ? 4 : 3), n.vel * 0.8); // in thirds
-  [[61, 1, 77], [61, 2, 76], [61, 3, 74], [61, 4, 72]].forEach(([b, be, m]) => N(bt(b, be), beatsToSec(bt(b, be), 1), L, m, 0.66));
-  N(bt(62), beatsToSec(bt(62), 4), L, 72, 0.62);
-  motif(63, 1, 77, 'major', L, 0.78);                                 // up an octave
-  [[65, 1, 81], [65, 2, 79], [65, 3, 77], [65, 4, 76]].forEach(([b, be, m]) => N(bt(b, be), beatsToSec(bt(b, be), 1), L, m, 0.7));
-  N(bt(66), beatsToSec(bt(66), 4), L, 74, 0.66);
-  N(bt(67), beatsToSec(bt(67), 4), L, 76, 0.6);
+  motif(65, 1, 65, 'major', L, 0.7);                                  // F C Bb A G
+  [[67, 1, 74], [67, 2, 72], [67, 3, 70], [67, 4, 69]].forEach(([b, be, m]) => N(bt(b, be), beatsToSec(bt(b, be), 1), L, m, 0.62));
+  N(bt(68), beatsToSec(bt(68), 4), L, 70, 0.6);
+  for (const n of motif(69, 1, 65, 'major', L, 0.72)) N(n.t, n.dur, L, n.midi + (n.midi % 12 === 5 || n.midi % 12 === 0 ? 4 : 3), n.vel * 0.8); // in thirds
+  [[71, 1, 77], [71, 2, 76], [71, 3, 74], [71, 4, 72]].forEach(([b, be, m]) => N(bt(b, be), beatsToSec(bt(b, be), 1), L, m, 0.66));
+  N(bt(72), beatsToSec(bt(72), 4), L, 72, 0.62);
+  motif(73, 1, 77, 'major', L, 0.78);                                 // up an octave
+  [[75, 1, 81], [75, 2, 79], [75, 3, 77], [75, 4, 76]].forEach(([b, be, m]) => N(bt(b, be), beatsToSec(bt(b, be), 1), L, m, 0.7));
+  N(bt(76), beatsToSec(bt(76), 4), L, 74, 0.66);
+  N(bt(77), beatsToSec(bt(77), 4), L, 76, 0.6);
 }
 // Fire crackle stream (granular), panned to the flames as the camera trucks.
-S(bt(55), bt(58) - bt(55), 'crackle', 0.55, friezeX(0, bt(55)), { wx: 0.0 });
-S(bt(57), 0.9, 'whoosh', 0.35, friezeX(2.0, bt(57)), { x1: friezeX(2.0, bt(57) + 0.9), small: true });
-for (const bar of [59, 60]) for (const b of [1, 3]) S(bt(bar, b), 0.6, 'clank', 0.7, friezeX(4.0, bt(bar, b)));
-for (const bar of [61, 62]) for (const b of [1, 2, 3, 4]) S(bt(bar, b), 0.35, 'hiss', 0.4, friezeX(6.0, bt(bar, b)));
+S(bt(65), bt(68) - bt(65), 'crackle', 0.55, friezeX(0, bt(65)), { wx: 0.0 });
+S(bt(67), 0.9, 'whoosh', 0.35, friezeX(2.0, bt(67)), { x1: friezeX(2.0, bt(67) + 0.9), small: true });
+for (const bar of [69, 70]) for (const b of [1, 3]) S(bt(bar, b), 0.6, 'clank', 0.7, friezeX(4.0, bt(bar, b)));
+for (const bar of [71, 72]) for (const b of [1, 2, 3, 4]) S(bt(bar, b), 0.35, 'hiss', 0.4, friezeX(6.0, bt(bar, b)));
 
-// ===== Globe (VII, bars 63-67) =============================================================
+// ===== Globe (VII, bars 73-77) =============================================================
 // Orthographic night-Earth. globeView(t) → centre longitude/latitude (deg) and radius
 // (as a fraction of half the screen height). Arcs, zaps and the renderer all use it.
 export const ROUND_ROCK = [30.5083, -97.6789];
@@ -536,12 +551,12 @@ export const cities = [
 export const globe = {
   // [t, lon0, lat0, radius]
   keys: [
-    [bt(62, 3), 10, 20, 0.0],
-    [bt(63), 10, 20, 0.78],
-    [bt(65), -40, 24, 0.80],
-    [bt(66, 3), -88, 28, 0.86],
-    [bt(67, 3), ROUND_ROCK[1], ROUND_ROCK[0], 3.2],
-    [bt(68), ROUND_ROCK[1], ROUND_ROCK[0], 60],
+    [bt(72, 3), 10, 20, 0.0],
+    [bt(73), 10, 20, 0.78],
+    [bt(75), -40, 24, 0.80],
+    [bt(76, 3), -88, 28, 0.86],
+    [bt(77, 3), ROUND_ROCK[1], ROUND_ROCK[0], 3.2],
+    [bt(78), ROUND_ROCK[1], ROUND_ROCK[0], 60],
   ],
 };
 export function globeView(t) {
@@ -571,14 +586,14 @@ export function globeProject(t, lat, lon, aspect = W / H) {
   return { x: px * v.r / aspect, y: py * v.r, visible: cosc > 0 };
 }
 {
-  // Arcs on the 8th notes, bars 63-66; then they converge on Round Rock (16ths, 66.3-67.3).
+  // Arcs on the 8th notes, bars 73-76; then they converge on Round Rock (16ths, 76.3-77.3).
   const cityIdx = (name) => cities.findIndex(c => c[0] === name);
   const rr = cityIdx('Round Rock');
   const pool = cities.map((_, i) => i).filter(i => i !== rr);
   let k = 0;
-  for (let bar = 63; bar <= 66; bar++) {
+  for (let bar = 73; bar <= 76; bar++) {
     for (const b of eighths()) {
-      if (bar === 66 && b >= 3) break;
+      if (bar === 76 && b >= 3) break;
       const t = bt(bar, b);
       const a = pool[Math.floor(R() * pool.length)];
       let c = pool[Math.floor(R() * pool.length)]; if (c === a) c = pool[(pool.indexOf(a) + 7) % pool.length];
@@ -588,7 +603,7 @@ export function globeProject(t, lat, lon, aspect = W / H) {
   }
   const conv = ['New York', 'London', 'Tokyo', 'São Paulo', 'Mexico City', 'Seattle', 'Chicago', 'Miami', 'Denver', 'Los Angeles', 'Boston', 'Houston', 'Dallas', 'Atlanta', 'Toronto', 'San Francisco'];
   sixteenths(3, 4.75).concat(sixteenths(1, 1.75).map(b => b + 4)).forEach((b, i) => {
-    const t = bt(66, b);
+    const t = bt(76, b);
     arcs.push({ t, from: cityIdx(conv[i % conv.length]), to: rr, dur: 1.0, converge: true });
   });
   for (const a of arcs) {
@@ -598,17 +613,17 @@ export function globeProject(t, lat, lon, aspect = W / H) {
     S(a.t + a.dur * 0.92, 0.25, 'zap', a.converge ? 0.32 : 0.4, a.x, { midi: 84 + (a.to * 5) % 12 });
   }
 }
-S(bt(66, 3), bt(68) - bt(66, 3), 'riser', 0.55, 0, { soft: true });
+S(bt(76, 3), bt(78) - bt(76, 3), 'riser', 0.55, 0, { soft: true });
 
-// ===== VIII · THE PROMPT (bars 68-74, 120 → 60 BPM, then free) =============================
-for (let bar = 68; bar <= 71; bar++) { padBar(bar, 0.24, 55, 76); subBar(bar, 0.35, [1], 38); drums(bar, { kick: [1] }, 0.5); }
+// ===== VIII · THE PROMPT (bars 78-84, 120 → 60 BPM, then free) =============================
+for (let bar = 78; bar <= 81; bar++) { padBar(bar, 0.24, 55, 76); subBar(bar, 0.35, [1], 38); drums(bar, { kick: [1] }, 0.5); }
 
 // Typing schedule: human speed for the first line, then exponential acceleration.
 export const typing = (() => {
   const text = PROMPT, n = text.length;
-  const start = bt(68, 3);            // 161.0
+  const start = bt(78, 3);            // 181.0
   const humanChars = 36;              // "Build a 3-minute film called ORIGIN:"
-  const last = 167.85;                // the last keystroke; the HUD reads NOW here
+  const last = 187.85;                // the last keystroke; the HUD reads NOW here
   const rng = mulberry32(0x7E57);
   const times = new Float64Array(n);
   let t = start;
@@ -642,7 +657,7 @@ export const typing = (() => {
   };
   const keyX = new Float32Array(n), keyRow = new Uint8Array(n);
   for (let i = 0; i < n; i++) { const [col, row] = keyPos(text[i]); keyX[i] = (col - 7) / 7.5; keyRow[i] = row; }
-  return { text, start, humanChars, last, times, keyX, keyRow, k, enter: bt(72), panScale: 0.42 };
+  return { text, start, humanChars, last, times, keyX, keyRow, k, enter: bt(82), panScale: 0.42 };
 })();
 /** Number of characters visible at time t. */
 export function typedCount(t) {
@@ -653,22 +668,22 @@ export function typedCount(t) {
   return lo;
 }
 S(typing.start, typing.last - typing.start + 0.05, 'keys', 0.8, 0);   // one granular stream, pans per key
-S(bt(70), bt(72) - bt(70), 'riser', 0.6, 0);
-export const ENTER_T = bt(72);
+S(bt(80), bt(82) - bt(80), 'riser', 0.6, 0);
+export const ENTER_T = bt(82);
 S(ENTER_T, 3.0, 'thunk', 0.9, 0.3);
 S(ENTER_T, 5.0, 'impact', 0.45, 0, { soft: true });
-export const renderBar = { t0: ENTER_T + 0.3, t1: 171.6 };
+export const renderBar = { t0: ENTER_T + 0.3, t1: 191.6 };
 for (let k = 0; k < 12; k++) S(renderBar.t0 + (renderBar.t1 - renderBar.t0) * (k / 11), 0.08, 'tick', 0.18, 0);
-// Rit: the leitmotif on the piano-pluck, resolving only at 176 s (E → D).
-for (let bar = 72; bar <= 74; bar++) padBar(bar, 0.26, 50, 74);
-subBar(72, 0.5, [1], 38); subBar(73, 0.45, [1], 38); subBar(74, 0.45, [1, 3], 38);
-motif(72, 1, 62, 'minor', 'piano', 0.7);
-N(bt(73, 3), beatsToSec(bt(73, 3), 1.5), 'piano', 57, 0.4);
-N(bt(74), beatsToSec(bt(74), 2), 'piano', 58, 0.42);
-N(bt(74, 3), 176 - bt(74, 3), 'piano', 64, 0.5);                    // E (unresolved)…
-N(176.0, 6.5, 'piano', 62, 0.62);                                    // …→ D at 176: resolution
-N(176.0, 6.5, 'piano', 50, 0.35);
-N(176.0, 5.5, 'pad', 50, 0.22); N(176.0, 5.5, 'pad', 57, 0.2); N(176.0, 5.5, 'pad', 62, 0.18);
+// Rit: the leitmotif on the piano-pluck, resolving only at 196 s (E → D).
+for (let bar = 82; bar <= 84; bar++) padBar(bar, 0.26, 50, 74);
+subBar(82, 0.5, [1], 38); subBar(83, 0.45, [1], 38); subBar(84, 0.45, [1, 3], 38);
+motif(82, 1, 62, 'minor', 'piano', 0.7);
+N(bt(83, 3), beatsToSec(bt(83, 3), 1.5), 'piano', 57, 0.4);
+N(bt(84), beatsToSec(bt(84), 2), 'piano', 58, 0.42);
+N(bt(84, 3), 196 - bt(84, 3), 'piano', 64, 0.5);                    // E (unresolved)…
+N(196.0, 6.5, 'piano', 62, 0.62);                                    // …→ D at 196: resolution
+N(196.0, 6.5, 'piano', 50, 0.35);
+N(196.0, 5.5, 'pad', 50, 0.22); N(196.0, 5.5, 'pad', 57, 0.2); N(196.0, 5.5, 'pad', 62, 0.18);
 
 notes.sort((a, b) => a.t - b.t || a.midi - b.midi);
 sfx.sort((a, b) => a.t - b.t);
@@ -677,15 +692,17 @@ sfx.sort((a, b) => a.t - b.t);
 // Exactly 180 s-periodic: every partial and LFO sits on a multiple of 1/180 Hz, so the loop
 // point is sample-continuous. The gain envelope wraps: g(180) = g(0).
 export const drone = {
-  partials: [                         // [cycles per 180 s, gain, pan]
-    [6608, 0.55, 0], [6609, 0.30, -0.2],      // D1 ≈ 36.711 Hz, slow beating pair
-    [9912, 0.22, 0.15],                       // A1 ≈ 55.067 Hz
-    [13216, 0.20, -0.1], [13218, 0.12, 0.25], // D2 ≈ 73.42 Hz
-    [19824, 0.08, 0.3],                       // A2
-    [26432, 0.05, -0.3],                      // D3
-  ],
-  lfoCycles: [7, 11, 13],             // amplitude LFOs, cycles per 180 s
-  gain: [[0, 0.5], [7.0, 0.5], [10.4, 0.8], [10.5, 0], [12, 0], [168, 0], [172, 0.12], [178, 0.42], [180, 0.5]],
+  // [Hz, gain, pan] → stored as [cycles per film, gain, pan]: each partial is rounded to a whole
+  // number of cycles over DURATION, so the drone is exactly periodic and the loop is seamless.
+  partials: [
+    [36.711, 0.55, 0], [36.717, 0.30, -0.2],      // D1, slow beating pair
+    [55.067, 0.22, 0.15],                         // A1
+    [73.422, 0.20, -0.1], [73.433, 0.12, 0.25],   // D2
+    [110.13, 0.08, 0.3],                          // A2
+    [146.84, 0.05, -0.3],                         // D3
+  ].map(([f, g, p]) => [Math.round(f * DURATION), g, p]),
+  lfoCycles: [7, 11, 13],             // amplitude LFOs, cycles per film
+  gain: [[0, 0.5], [7.0, 0.5], [10.4, 0.8], [10.5, 0], [12, 0], [188, 0], [192, 0.12], [198, 0.42], [DURATION, 0.5]],
 };
 
 // ---------------------------------------------------------------- mix automation
@@ -709,7 +726,7 @@ export const flashes = [
 export const storyBeats = [
   { t: 10.5, name: 'collapse to pinprick', dur: 0.25 },
   { t: bt(8), name: 'first star ignites', dur: 0.1 },
-  { t: bt(54, 3), name: 'the torch catches', dur: 0.3 },
+  { t: bt(63, 3), name: 'the torch catches', dur: 0.3 },
 ];
 /** Exposure pulse per kick (fraction of exposure added at the hit), by chapter. */
 export const pulse = { I: 0, II: 0.22, III: 0.16, IV: 0.16, V: 0.12, VI: 0.12, VII: 0.13, VIII: 0.14, tau: 0.085 };
@@ -736,14 +753,14 @@ export function flashAt(t) {
 // and reads NOW from the last keystroke.
 export const hud = {
   fadeIn: [1.0, 2.5],
-  fadeOut: [174.0, 175.5],
+  fadeOut: [194.0, 195.5],
   anchors: [
     [0, 13.8e9], [12, 13.8e9], [bt(5), 13.79962e9], [32, 13.6e9], [bt(12), 12.0e9], [58, 4.6e9],
     [THEIA_T, 4.51e9], [bt(29), 4.4e9], [SPLASH_T, 3.9e9], [106, 3.8e9], [bt(45), 4.7e8],
     [BREACH_T, 3.8e8], [march.stages[0].t0, 3.75e8], [march.stages[1].t0, 3.4e8], [march.stages[2].t0, 3.1e8],
     [march.stages[3].t0, 2.3e8], [march.stages[4].t0, 6.6e7], [march.stages[5].t0, 2.0e7], [march.stages[6].t0, 2.0e6],
-    [march.torch, 1.05e6], [134, 1.0e6], [bt(57), 5500],
-    [bt(59), 586], [bt(61), 250], [bt(63), 55], [bt(66, 3), 1], [typing.start, 1 / 365.25],
+    [march.torch, 1.05e6], [bt(65), 1.0e6], [bt(67), 5500],
+    [bt(69), 586], [bt(71), 250], [bt(73), 55], [bt(76, 3), 1], [typing.start, 1 / 365.25],
     [typing.times[typing.humanChars], 1 / 8766], [typing.last, 1 / 31557600],
   ],
 };
@@ -908,11 +925,12 @@ export const cameras = {
           { t: 88.0, pos: [0.37464, -0.11256, 4.28217], target: [0, 0, 0], fov: 40, roll: 6 },
           { t: 92.0, pos: [0.84873, -0.23076, 3.67625], target: [0, 0, 0], fov: 40, roll: 17 },
           { t: 96.0, pos: [1.19217, -0.33449, 2.95073], target: [0, 0, 0], fov: 40, roll: 32 } ],
-  // VI: metres, sea surface y = 0. Macro on the stromatolite's live colony (patch faces 12° up) →
-  // crane back and up, rising through the surface 113.8–114.3 (the waterline sweeps down from the
-  // top edge, ease-out) → over-under at the waterline (y = 0.004 keeps the meniscus near centre) →
-  // tilt up with the breach → pan to the sun (yaw 50°) and hold level so the sunset horizon and
-  // the ember sit at the exact centre. Authored in src/chapters/ch6/camera.js.
+  // VI: metres, sea surface y = 0. Macro on the stromatolite's live colony → crane back and up,
+  // rising through the surface ~113.8–114.3 → over-under at the waterline (the forest sprouts, the
+  // school gathers, the breach at BREACH_T) → tilt up with the flock and swing to the sun → the march:
+  // level at the sun on the horizon (screen centre), trucking so the lead walker's screen x follows
+  // marchX, craning with the raised torch so its flame lands on the horizon at the centre at
+  // march.torch → night: dolly straight back along the axis. GENERATED by `node src/chapters/ch6/camera.js`.
   VI:   [ { t: 105, pos: [0, -0.57581, -1.34994], target: [0, -1.19955, -4.28438], fov: 50, roll: 0 },
           { t: 108, pos: [0, -0.57831, -1.36168], target: [0, -1.20204, -4.29612], fov: 50, roll: 0 },
           { t: 110, pos: [0, -0.57997, -1.3695], target: [0, -1.2037, -4.30395], fov: 50, roll: 0 },
@@ -924,40 +942,146 @@ export const cameras = {
           { t: 114.3, pos: [0, 0.003, -0.52], target: [0, -0.02842, -3.51984], fov: 50, roll: 0 },
           { t: 114.6, pos: [0, 0.004, -0.45], target: [0, 0.004, -3.45], fov: 50, roll: 0 },
           { t: 114.9, pos: [0, 0.004, -0.39], target: [0, 0.004, -3.39], fov: 50, roll: 0 },
-          { t: 118, pos: [0, 0.004, 0.35], target: [0, 0.004, -2.65], fov: 50, roll: 0 },
-          { t: 122, pos: [0, 0.004, 0.75], target: [0, 0.004, -2.25], fov: 50, roll: 0 },
-          { t: 125.6, pos: [0, 0.004, 0.85], target: [0, 0.004, -2.15], fov: 50, roll: 0 },
-          { t: 126.2, pos: [0, 0.03, 0.85], target: [0.05207, 0.34359, -2.13311], fov: 50, roll: 0 },
-          { t: 126.8, pos: [0.05, 0.2, 0.9], target: [0.19558, 1.32382, -1.87774], fov: 50, roll: 0 },
-          { t: 127.7, pos: [0.15, 0.5, 0.95], target: [0.76651, 1.72021, -1.72039], fov: 48, roll: 0 },
-          { t: 128.6, pos: [0.3, 1, 1], target: [1.73446, 1.87712, -1.48455], fov: 44, roll: 0 },
-          { t: 129.6, pos: [0.4, 1.4, 1], target: [2.43074, 1.76561, -1.17771], fov: 35, roll: 0 },
-          { t: 130.6, pos: [0.4, 1.5, 1], target: [2.69813, 1.5, -0.92836], fov: 27, roll: 0 },
-          { t: 131.5, pos: [0.4, 1.5, 1], target: [2.69813, 1.5, -0.92836], fov: 25.5, roll: 0 },
-          { t: 134, pos: [0.4, 1.5, 1], target: [2.69813, 1.5, -0.92836], fov: 22.5, roll: 0 },
-          { t: 135, pos: [0.4, 1.5, 1], target: [2.69813, 1.5, -0.92836], fov: 22, roll: 0 } ],
-  VII:  [ { t: 133.0, pos: [0, 0, 1], target: [0, 0, 0], fov: 50, roll: 0 },
-          { t: 160.6, pos: [0, 0, 1], target: [0, 0, 0], fov: 50, roll: 0 } ],
+          { t: 118.5, pos: [0, 0.004, 0], target: [0, 0.004, -3], fov: 50, roll: 0 },
+          { t: 122.5, pos: [0, 0.004, 0.33], target: [0, 0.004, -2.67], fov: 50, roll: 0 },
+          { t: 125.6, pos: [0, 0.004, 0.5], target: [0, 0.004, -2.5], fov: 50, roll: 0 },
+          { t: 126, pos: [0, 0.006, 0.52], target: [0, 0.08453, -2.47897], fov: 50, roll: 0 },
+          { t: 126.4, pos: [0.03, 0.13, 0.58], target: [0.23116, 0.95691, -2.29676], fov: 50, roll: 0 },
+          { t: 126.72, pos: [0.12, 0.36, 0.7], target: [0.99025, 1.72197, -1.82739], fov: 44, roll: 0 },
+          { t: 127.02, pos: [0.2, 0.57, 0.82], target: [2.00547, 1.44712, -1.40957], fov: 35, roll: 0 },
+          { t: 127.36, pos: [-0.13059, 0.7, 0.44643], target: [2.16754, 0.7, -1.48193], fov: 24, roll: 0 },
+          { t: 127.75, pos: [0.14172, 0.7, 0.77096], target: [2.43985, 0.7, -1.15741], fov: 24, roll: 0 },
+          { t: 128, pos: [0.25, 0.7, 0.9], target: [2.54813, 0.7, -1.02836], fov: 24, roll: 0 },
+          { t: 128.25, pos: [0.33013, 0.70001, 0.99549], target: [2.62826, 0.70001, -0.93287], fov: 24, roll: 0 },
+          { t: 128.5, pos: [0.47234, 0.70007, 1.16498], target: [2.77047, 0.70007, -0.76339], fov: 24, roll: 0 },
+          { t: 128.75, pos: [0.61456, 0.70022, 1.33446], target: [2.91269, 0.70022, -0.5939], fov: 24, roll: 0 },
+          { t: 129, pos: [0.69468, 0.70052, 1.42995], target: [2.99281, 0.70052, -0.49841], fov: 24, roll: 0 },
+          { t: 129.25, pos: [0.77481, 0.70099, 1.52544], target: [3.07294, 0.70099, -0.40292], fov: 24, roll: 0 },
+          { t: 129.5, pos: [0.91702, 0.70168, 1.69493], target: [3.21516, 0.70168, -0.23344], fov: 24, roll: 0 },
+          { t: 129.75, pos: [1.05924, 0.70262, 1.86441], target: [3.35737, 0.70262, -0.06395], fov: 24, roll: 0 },
+          { t: 130, pos: [1.13936, 0.70383, 1.9599], target: [3.4375, 0.70383, 0.03154], fov: 24, roll: 0 },
+          { t: 130.25, pos: [1.21949, 0.70536, 2.05539], target: [3.51762, 0.70536, 0.12703], fov: 24, roll: 0 },
+          { t: 130.5, pos: [1.3617, 0.70721, 2.22488], target: [3.65984, 0.70721, 0.29651], fov: 24, roll: 0 },
+          { t: 130.75, pos: [1.50334, 0.70941, 2.39367], target: [3.80147, 0.70941, 0.46531], fov: 24, roll: 0 },
+          { t: 131, pos: [1.61196, 0.71199, 2.52312], target: [3.91009, 0.71199, 0.59475], fov: 24, roll: 0 },
+          { t: 131.25, pos: [1.72779, 0.71495, 2.66116], target: [4.02592, 0.71495, 0.73279], fov: 24, roll: 0 },
+          { t: 131.5, pos: [1.84362, 0.71831, 2.7992], target: [4.14175, 0.71831, 0.87084], fov: 24, roll: 0 },
+          { t: 131.75, pos: [1.95945, 0.72208, 2.93724], target: [4.25758, 0.72208, 1.00888], fov: 24, roll: 0 },
+          { t: 132, pos: [2.07528, 0.72627, 3.07528], target: [4.37341, 0.72627, 1.14692], fov: 24, roll: 0 },
+          { t: 132.25, pos: [2.19111, 0.73088, 3.21332], target: [4.48924, 0.73088, 1.28496], fov: 24, roll: 0 },
+          { t: 132.5, pos: [2.30694, 0.73592, 3.35137], target: [4.60507, 0.73592, 1.423], fov: 24, roll: 0 },
+          { t: 132.75, pos: [2.42277, 0.74139, 3.48941], target: [4.7209, 0.74139, 1.56104], fov: 24, roll: 0 },
+          { t: 133, pos: [2.5386, 0.74729, 3.62745], target: [4.83673, 0.74729, 1.69909], fov: 24, roll: 0 },
+          { t: 133.25, pos: [2.65443, 0.75361, 3.76549], target: [4.95257, 0.75361, 1.83713], fov: 24, roll: 0 },
+          { t: 133.5, pos: [2.77026, 0.76036, 3.90353], target: [5.0684, 0.76036, 1.97517], fov: 24, roll: 0 },
+          { t: 133.75, pos: [2.88179, 0.76752, 4.03644], target: [5.17992, 0.76752, 2.10808], fov: 24, roll: 0 },
+          { t: 134, pos: [3.08909, 0.77508, 4.28349], target: [5.38722, 0.77508, 2.35513], fov: 24, roll: 0 },
+          { t: 134.25, pos: [3.35019, 0.78305, 4.59466], target: [5.64832, 0.78305, 2.6663], fov: 24, roll: 0 },
+          { t: 134.5, pos: [3.61129, 0.79139, 4.90583], target: [5.90942, 0.79139, 2.97746], fov: 24, roll: 0 },
+          { t: 134.75, pos: [3.87239, 0.80011, 5.21699], target: [6.17052, 0.80011, 3.28863], fov: 24, roll: 0 },
+          { t: 135, pos: [4.13349, 0.80919, 5.52816], target: [6.43162, 0.80919, 3.5998], fov: 24, roll: 0 },
+          { t: 135.25, pos: [4.39459, 0.81861, 5.83933], target: [6.69272, 0.81861, 3.91097], fov: 24, roll: 0 },
+          { t: 135.5, pos: [4.65569, 0.82835, 6.1505], target: [6.95382, 0.82835, 4.22213], fov: 24, roll: 0 },
+          { t: 135.75, pos: [4.91679, 0.8384, 6.46166], target: [7.21492, 0.8384, 4.5333], fov: 24, roll: 0 },
+          { t: 136, pos: [5.17789, 0.84874, 6.77283], target: [7.47602, 0.84874, 4.84447], fov: 24, roll: 0 },
+          { t: 136.25, pos: [5.43899, 0.85934, 7.084], target: [7.73712, 0.85934, 5.15564], fov: 24, roll: 0 },
+          { t: 136.5, pos: [5.70009, 0.87019, 7.39517], target: [7.99823, 0.87019, 5.4668], fov: 24, roll: 0 },
+          { t: 136.75, pos: [5.96119, 0.88126, 7.70633], target: [8.25933, 0.88126, 5.77797], fov: 24, roll: 0 },
+          { t: 137, pos: [6.22229, 0.89253, 8.0175], target: [8.52043, 0.89253, 6.08914], fov: 24, roll: 0 },
+          { t: 137.25, pos: [6.48339, 0.90398, 8.32867], target: [8.78153, 0.90398, 6.40031], fov: 24, roll: 0 },
+          { t: 137.5, pos: [6.74449, 0.91558, 8.63984], target: [9.04263, 0.91558, 6.71147], fov: 24, roll: 0 },
+          { t: 137.75, pos: [7.00685, 0.92731, 8.9525], target: [9.30499, 0.92731, 7.02414], fov: 24, roll: 0 },
+          { t: 138, pos: [7.24124, 0.93914, 9.23184], target: [9.53937, 0.93914, 7.30347], fov: 24, roll: 0 },
+          { t: 138.25, pos: [7.45992, 0.95105, 9.49245], target: [9.75805, 0.95105, 7.56408], fov: 24, roll: 0 },
+          { t: 138.5, pos: [7.67859, 0.96301, 9.75305], target: [9.97673, 0.96301, 7.82469], fov: 24, roll: 0 },
+          { t: 138.75, pos: [7.89727, 0.975, 10.01366], target: [10.1954, 0.975, 8.0853], fov: 24, roll: 0 },
+          { t: 139, pos: [8.11595, 0.98699, 10.27427], target: [10.41408, 0.98699, 8.34591], fov: 24, roll: 0 },
+          { t: 139.25, pos: [8.33462, 0.99895, 10.53488], target: [10.63276, 0.99895, 8.60652], fov: 24, roll: 0 },
+          { t: 139.5, pos: [8.5533, 1.01086, 10.79549], target: [10.85143, 1.01086, 8.86713], fov: 24, roll: 0 },
+          { t: 139.75, pos: [8.77198, 1.02269, 11.0561], target: [11.07011, 1.02269, 9.12773], fov: 24, roll: 0 },
+          { t: 140, pos: [8.99065, 1.03442, 11.31671], target: [11.28879, 1.03442, 9.38834], fov: 24, roll: 0 },
+          { t: 140.25, pos: [9.20933, 1.04602, 11.57731], target: [11.50746, 1.04602, 9.64895], fov: 24, roll: 0 },
+          { t: 140.5, pos: [9.42801, 1.05747, 11.83792], target: [11.72614, 1.05747, 9.90956], fov: 24, roll: 0 },
+          { t: 140.75, pos: [9.64668, 1.06874, 12.09853], target: [11.94482, 1.06874, 10.17017], fov: 24, roll: 0 },
+          { t: 141, pos: [9.86536, 1.07981, 12.35914], target: [12.16349, 1.07981, 10.43078], fov: 24, roll: 0 },
+          { t: 141.25, pos: [10.08404, 1.09066, 12.61975], target: [12.38217, 1.09066, 10.69139], fov: 24, roll: 0 },
+          { t: 141.5, pos: [10.30271, 1.10126, 12.88036], target: [12.60085, 1.10126, 10.952], fov: 24, roll: 0 },
+          { t: 141.75, pos: [10.52328, 1.1116, 13.14321], target: [12.82141, 1.1116, 11.21485], fov: 24, roll: 0 },
+          { t: 142, pos: [10.70189, 1.12165, 13.35607], target: [13.00002, 1.12165, 11.42771], fov: 24, roll: 0 },
+          { t: 142.25, pos: [10.85693, 1.13139, 13.54084], target: [13.15506, 1.13139, 11.61248], fov: 24, roll: 0 },
+          { t: 142.5, pos: [11.01197, 1.14081, 13.72561], target: [13.3101, 1.14081, 11.79725], fov: 24, roll: 0 },
+          { t: 142.75, pos: [11.16701, 1.14989, 13.91038], target: [13.46514, 1.14989, 11.98202], fov: 24, roll: 0 },
+          { t: 143, pos: [11.32205, 1.15861, 14.09515], target: [13.62018, 1.15861, 12.16679], fov: 24, roll: 0 },
+          { t: 143.25, pos: [11.47709, 1.16695, 14.27992], target: [13.77522, 1.16695, 12.35156], fov: 24, roll: 0 },
+          { t: 143.5, pos: [11.63213, 1.17492, 14.46469], target: [13.93026, 1.17492, 12.53633], fov: 24, roll: 0 },
+          { t: 143.75, pos: [11.78717, 1.18248, 14.64946], target: [14.0853, 1.18248, 12.7211], fov: 24, roll: 0 },
+          { t: 144, pos: [11.94221, 1.18964, 14.83423], target: [14.24034, 1.18964, 12.90587], fov: 24, roll: 0 },
+          { t: 144.25, pos: [12.09725, 1.19639, 15.01901], target: [14.39539, 1.19639, 13.09064], fov: 24, roll: 0 },
+          { t: 144.5, pos: [12.25229, 1.20271, 15.20378], target: [14.55043, 1.20271, 13.27541], fov: 24, roll: 0 },
+          { t: 144.75, pos: [12.40723, 1.20861, 15.38843], target: [14.70537, 1.20861, 13.46006], fov: 24, roll: 0 },
+          { t: 145, pos: [12.55932, 1.21408, 15.56967], target: [14.85745, 1.21408, 13.64131], fov: 24, roll: 0 },
+          { t: 145.25, pos: [12.71265, 1.21912, 15.75241], target: [15.01079, 1.21912, 13.82405], fov: 24, roll: 0 },
+          { t: 145.5, pos: [12.88547, 1.22373, 15.95836], target: [15.1836, 1.22373, 14.03], fov: 24, roll: 0 },
+          { t: 145.75, pos: [13.05828, 1.22792, 16.16432], target: [15.35641, 1.22792, 14.23595], fov: 24, roll: 0 },
+          { t: 146, pos: [13.21162, 1.23169, 16.34705], target: [15.50975, 1.23169, 14.41869], fov: 24, roll: 0 },
+          { t: 146.25, pos: [13.36495, 1.23505, 16.52979], target: [15.66309, 1.23505, 14.60143], fov: 24, roll: 0 },
+          { t: 146.5, pos: [13.53777, 1.23801, 16.73575], target: [15.8359, 1.23801, 14.80738], fov: 24, roll: 0 },
+          { t: 146.75, pos: [13.71058, 1.24059, 16.9417], target: [16.00872, 1.24059, 15.01334], fov: 24, roll: 0 },
+          { t: 147, pos: [13.86392, 1.24279, 17.12444], target: [16.16205, 1.24279, 15.19608], fov: 24, roll: 0 },
+          { t: 147.25, pos: [14.01726, 1.24464, 17.30718], target: [16.31539, 1.24464, 15.37881], fov: 24, roll: 0 },
+          { t: 147.5, pos: [14.19007, 1.24617, 17.51313], target: [16.4882, 1.24617, 15.58477], fov: 24, roll: 0 },
+          { t: 147.75, pos: [14.36222, 1.24738, 17.71829], target: [16.66036, 1.24738, 15.78993], fov: 24, roll: 0 },
+          { t: 148, pos: [14.53471, 1.24832, 17.92385], target: [16.83284, 1.24832, 15.99549], fov: 24, roll: 0 },
+          { t: 148.25, pos: [14.71546, 1.24901, 18.13926], target: [17.01359, 1.24901, 16.2109], fov: 24, roll: 0 },
+          { t: 148.5, pos: [14.89621, 1.24948, 18.35468], target: [17.19434, 1.24948, 16.42631], fov: 24, roll: 0 },
+          { t: 148.75, pos: [15.07696, 1.24978, 18.57009], target: [17.3751, 1.24978, 16.64172], fov: 24, roll: 0 },
+          { t: 149, pos: [15.2774, 1.24993, 18.80896], target: [17.57554, 1.24993, 16.8806], fov: 24, roll: 0 },
+          { t: 149.25, pos: [15.59076, 1.24999, 19.1824], target: [17.88889, 1.24999, 17.25404], fov: 24, roll: 0 },
+          { t: 149.5, pos: [15.86204, 1.25, 19.5057], target: [18.16017, 1.25, 17.57734], fov: 24, roll: 0 },
+          { t: 149.75, pos: [15.96961, 1.25, 19.6339], target: [18.26774, 1.25, 17.70554], fov: 24, roll: 0 },
+          { t: 150, pos: [15.99041, 1.25111, 19.65869], target: [18.28854, 1.25111, 17.73033], fov: 24, roll: 0 },
+          { t: 150.25, pos: [15.99041, 1.28697, 19.65869], target: [18.28854, 1.28697, 17.73033], fov: 24, roll: 0 },
+          { t: 150.5, pos: [15.99041, 1.57625, 19.65869], target: [18.28854, 1.57625, 17.73033], fov: 24, roll: 0 },
+          { t: 150.75, pos: [15.99041, 2.05727, 19.65869], target: [18.28854, 2.05727, 17.73033], fov: 24, roll: 0 },
+          { t: 151, pos: [15.99041, 2.12054, 19.65869], target: [18.28854, 2.12054, 17.73033], fov: 24, roll: 0 },
+          { t: 151.25, pos: [15.99041, 2.12054, 19.65869], target: [18.28854, 2.12054, 17.73033], fov: 24, roll: 0 },
+          { t: 151.5, pos: [15.90622, 2.12054, 19.72933], target: [18.20435, 2.12054, 17.80097], fov: 24, roll: 0 },
+          { t: 151.75, pos: [15.38745, 2.12054, 20.16463], target: [17.68559, 2.12054, 18.23627], fov: 24, roll: 0 },
+          { t: 152, pos: [14.17936, 2.12054, 21.17834], target: [16.47749, 2.12054, 19.24998], fov: 24, roll: 0 },
+          { t: 152.25, pos: [12.19463, 2.12054, 22.84373], target: [14.49276, 2.12054, 20.91537], fov: 24, roll: 0 },
+          { t: 152.5, pos: [9.48181, 2.12054, 25.12005], target: [11.77994, 2.12054, 23.19169], fov: 24, roll: 0 },
+          { t: 152.75, pos: [6.19372, 2.12054, 27.87909], target: [8.49185, 2.12054, 25.95073], fov: 24, roll: 0 },
+          { t: 153, pos: [2.55582, 2.12054, 30.93165], target: [4.85396, 2.12054, 29.00328], fov: 24, roll: 0 },
+          { t: 153.25, pos: [-1.16532, 2.12054, 34.05406], target: [1.13281, 2.12054, 32.12569], fov: 24, roll: 0 },
+          { t: 153.5, pos: [-4.69368, 2.12054, 37.01471], target: [-2.39555, 2.12054, 35.08634], fov: 24, roll: 0 },
+          { t: 153.75, pos: [-7.77536, 2.12054, 39.60054], target: [-5.47723, 2.12054, 37.67218], fov: 24, roll: 0 },
+          { t: 154, pos: [-10.21015, 2.12054, 41.64357], target: [-7.91202, 2.12054, 39.71521], fov: 24, roll: 0 },
+          { t: 154.25, pos: [-11.88316, 2.12054, 43.04739], target: [-9.58502, 2.12054, 41.11903], fov: 24, roll: 0 },
+          { t: 154.5, pos: [-12.79637, 2.12054, 43.81367], target: [-10.49824, 2.12054, 41.88531], fov: 24, roll: 0 },
+          { t: 154.75, pos: [-13.1003, 2.12054, 44.06869], target: [-10.80217, 2.12054, 42.14033], fov: 24, roll: 0 },
+          { t: 155, pos: [-13.11928, 2.12054, 44.08462], target: [-10.82115, 2.12054, 42.15626], fov: 24, roll: 0 } ],
+  VII:  [ { t: 153.0, pos: [0, 0, 1], target: [0, 0, 0], fov: 50, roll: 0 },
+          { t: 180.6, pos: [0, 0, 1], target: [0, 0, 0], fov: 50, roll: 0 } ],
   // VIII: metres (desk top y = 0). 159.2–160.3 the caret held at the exact centre (targets on the
   // caret, positions on its display normal), pull back to the typing hero shot (keyboard spans
   // ±0.42 NDC so key x ≈ keyclick pan), push in with the acceleration, breathe out after Enter,
   // then the recursion push: swing head-on and unroll until the 16:9 display exactly fills the
   // frame at 179.98333 (fov 30, d = 0.30901 m). Solved from src/chapters/ch8/layout.js.
-  VIII: [ { t: 159.2, pos: [-0.120949, 0.329726, 0.256663], target: [-0.120949, 0.179237, -0.156802], fov: 30, roll: 0 },
-          { t: 160.3, pos: [-0.120949, 0.339986, 0.284854], target: [-0.120949, 0.179237, -0.156802], fov: 30, roll: 0 },
-          { t: 160.36, pos: [-0.120949, 0.340602, 0.286545], target: [-0.120949, 0.179237, -0.156802], fov: 30, roll: 0, ease: 'inout' },
-          { t: 161.35, pos: [-0.01959, 0.361014, 0.502992], target: [0, 0.075, -0.058], fov: 30, roll: 0 },
-          { t: 163.4, pos: [0.019291, 0.347598, 0.492422], target: [0, 0.078, -0.06], fov: 30, roll: 0 },
-          { t: 165.6, pos: [0.067644, 0.304337, 0.393312], target: [0, 0.093, -0.088], fov: 30, roll: 0 },
-          { t: 167.85, pos: [0.080161, 0.267266, 0.300393], target: [0, 0.106, -0.112], fov: 30, roll: -1 },
-          { t: 168.7, pos: [0.068408, 0.280256, 0.317912], target: [0, 0.108, -0.114], fov: 30, roll: -1 },
-          { t: 171.6, pos: [-0.1631, 0.436095, 0.601463], target: [0, 0.098, -0.105], fov: 30, roll: -8 },
-          { t: 172.7, pos: [-0.213057, 0.494999, 0.608506], target: [0, 0.118, -0.134513], fov: 30, roll: -13 },
-          { t: 174.5, pos: [-0.110292, 0.387605, 0.490986], target: [0, 0.118, -0.134513], fov: 30, roll: -12 },
-          { t: 176, pos: [-0.034515, 0.307935, 0.359079], target: [0, 0.118, -0.134513], fov: 30, roll: -7 },
-          { t: 177.5, pos: [-0.006547, 0.256775, 0.240585], target: [0, 0.118, -0.134513], fov: 30, roll: -2.5 },
-          { t: 178.8, pos: [0, 0.229423, 0.17079], target: [0, 0.118, -0.134513], fov: 30, roll: -0.3, ease: 'out' },
-          { t: 179.98333, pos: [0, 0.223689, 0.155865], target: [0, 0.118, -0.134513], fov: 30, roll: 0 } ],
+  VIII: [ { t: 179.2, pos: [-0.120949, 0.329726, 0.256663], target: [-0.120949, 0.179237, -0.156802], fov: 30, roll: 0 },
+          { t: 180.3, pos: [-0.120949, 0.339986, 0.284854], target: [-0.120949, 0.179237, -0.156802], fov: 30, roll: 0 },
+          { t: 180.36, pos: [-0.120949, 0.340602, 0.286545], target: [-0.120949, 0.179237, -0.156802], fov: 30, roll: 0, ease: 'inout' },
+          { t: 181.35, pos: [-0.01959, 0.361014, 0.502992], target: [0, 0.075, -0.058], fov: 30, roll: 0 },
+          { t: 183.4, pos: [0.019291, 0.347598, 0.492422], target: [0, 0.078, -0.06], fov: 30, roll: 0 },
+          { t: 185.6, pos: [0.067644, 0.304337, 0.393312], target: [0, 0.093, -0.088], fov: 30, roll: 0 },
+          { t: 187.85, pos: [0.080161, 0.267266, 0.300393], target: [0, 0.106, -0.112], fov: 30, roll: -1 },
+          { t: 188.7, pos: [0.068408, 0.280256, 0.317912], target: [0, 0.108, -0.114], fov: 30, roll: -1 },
+          { t: 191.6, pos: [-0.1631, 0.436095, 0.601463], target: [0, 0.098, -0.105], fov: 30, roll: -8 },
+          { t: 192.7, pos: [-0.213057, 0.494999, 0.608506], target: [0, 0.118, -0.134513], fov: 30, roll: -13 },
+          { t: 194.5, pos: [-0.110292, 0.387605, 0.490986], target: [0, 0.118, -0.134513], fov: 30, roll: -12 },
+          { t: 196.0, pos: [-0.034515, 0.307935, 0.359079], target: [0, 0.118, -0.134513], fov: 30, roll: -7 },
+          { t: 197.5, pos: [-0.006547, 0.256775, 0.240585], target: [0, 0.118, -0.134513], fov: 30, roll: -2.5 },
+          { t: 198.8, pos: [0, 0.229423, 0.17079], target: [0, 0.118, -0.134513], fov: 30, roll: -0.3, ease: 'out' },
+          { t: 199.98333, pos: [0, 0.223689, 0.155865], target: [0, 0.118, -0.134513], fov: 30, roll: 0 } ],
 };
 /** Catmull-Rom sample of a keyframe list at t (clamped at the ends). Keys may add `ease`. */
 export function sampleCamera(keys, t) {

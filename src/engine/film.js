@@ -62,13 +62,13 @@ export class Film {
     this.ldr = makeTarget(W, H, { float: false });
     this.post = new Post(r, W, H);
     this.ui = new UI(W, H);
-    this.features = await new Features().load(this.featuresUrl);
+    this.features = this.featuresUrl ? await new Features().load(this.featuresUrl) : new Features();
     this.copy = new Pass(G.header + `in vec2 vUv; out vec4 fragColor; uniform sampler2D src; void main(){ fragColor = texture(src, vUv); }`, { src: { value: null } });
 
     this.ctx = {
       THREE, renderer: r, gl, W, H, aspect: W / H, fps: this.fps, quality: this.quality, draft: W < 1920,
       T, timeline: T, features: this.features, glsl: G, makeTarget, Pass, FONTS, film: this,
-      frameSeed: (t) => Math.round(t * 60),
+      frameSeed: (t) => (this.fixSeed ? 0 : Math.round(t * 60)),
       /** Apply a timeline camera sample ({pos,target,fov,roll}) to a THREE.PerspectiveCamera. */
       applyCamera: (cam, k) => {
         cam.position.set(...k.pos);
@@ -126,7 +126,7 @@ export class Film {
   renderTo(t, out) {
     const act = T.activeChapters(t);
     const r = this.renderer;
-    const extra = { pulse: T.kickPulse(t), flash: T.flashAt(t), frameSeed: Math.round(t * 60) % 100000, uiOn: true };
+    const extra = { pulse: T.kickPulse(t), flash: T.flashAt(t), frameSeed: this.fixSeed ? 0 : Math.round(t * 60) % 100000, uiOn: true };
 
     // Chapter VIII can own the final composite (its recursion needs the whole pipeline).
     const top = act[act.length - 1];

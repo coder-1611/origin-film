@@ -3,7 +3,7 @@
 // encodes H.264 CRF 16 yuv420p (BT.709) + AAC 320k with the mastered score.
 //   node tools/render.mjs                         final: 1920×1080 @ 60 → renders/origin.mp4
 //   node tools/render.mjs --draft                 540p @ 30 → renders/origin-draft.mp4
-//   --workers 4  --from 0 --to 10800 (frame indices)  --encode-only  --no-encode
+//   --workers 4  --from 0 --to 12000 (frame indices)  --encode-only  --no-encode
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -14,7 +14,8 @@ const argv = process.argv.slice(2);
 const opt = (k, d) => { const i = argv.indexOf('--' + k); return i < 0 ? d : (argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : true); };
 const draft = !!opt('draft', false);
 const W = +opt('w', draft ? 960 : 1920), H = +opt('h', draft ? 540 : 1080), FPS = +opt('fps', draft ? 30 : 60);
-const TOTAL = FPS * 180;
+const T = await import(path.join(ROOT, 'src/timeline.js'));
+const TOTAL = FPS * T.DURATION;
 const from = +opt('from', 0), to = +opt('to', TOTAL);
 const workers = +opt('workers', 4);
 const dir = path.join(ROOT, 'frames', `${W}x${H}@${FPS}`);
@@ -80,8 +81,8 @@ if (!opt('no-encode', false)) {
   // Gapless audio loop. AAC starts cold (priming) and pads its last frame, both of which would
   // click at the wrap. So the score is encoded circularly padded (1 s of its ending before it,
   // 1 s of its opening after it), every packet is kept (the decoder gets real pre-roll), and the
-  // MP4 edit list is rewritten to present exactly samples [0, 180 s) of the film: container,
-  // video and audio durations are all exactly 180.000 s.
+  // MP4 edit list is rewritten to present exactly samples [0, DURATION) of the film: container,
+  // video and audio durations are all exactly the film's length.
   const { readWav, writeWavF32 } = await import('./lib/dsp.mjs');
   const { setGaplessEdit } = await import('./lib/mp4-edit.mjs');
   const { inter, sr } = readWav(wav), n = inter.length / 2, P = sr;

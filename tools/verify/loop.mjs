@@ -7,11 +7,12 @@ import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { ROOT } from '../lib/serve.mjs';
 import { readWav, decodeAudio } from '../lib/dsp.mjs';
+const T = await import(path.join(ROOT, 'src/timeline.js'));
 const file = process.argv[2] || path.join(ROOT, 'renders/origin.mp4');
 const res = {};
-const fdir = path.join(ROOT, 'frames/1920x1080@60');
-if (fs.existsSync(path.join(fdir, 'f10799.jpg'))) {
-  const a = fs.readFileSync(path.join(fdir, 'f00000.jpg')), b = fs.readFileSync(path.join(fdir, 'f10799.jpg'));
+const fdir = path.join(ROOT, 'frames/1920x1080@60'), lastF = `f${String(T.FRAMES - 1).padStart(5, '0')}.jpg`;
+if (fs.existsSync(path.join(fdir, lastF))) {
+  const a = fs.readFileSync(path.join(fdir, 'f00000.jpg')), b = fs.readFileSync(path.join(fdir, lastF));
   res.sourceFramesIdenticalBytes = crypto.createHash('md5').update(a).digest('hex') === crypto.createHash('md5').update(b).digest('hex');
 }
 const grab = (sel) => execFileSync('ffmpeg', ['-v', 'error', '-i', file, '-vf', `select='${sel}',format=rgb24`, '-frames:v', '1', '-f', 'rawvideo', '-'], { maxBuffer: 1 << 28 });
@@ -21,10 +22,10 @@ let sad = 0, mx = 0, se = 0;
 for (let i = 0; i < f0.length; i++) { const d = Math.abs(f0[i] - fl[i]); sad += d; mx = Math.max(mx, d); se += d * d; }
 res.mp4Frames = nb;
 res.mp4FirstVsLast = { meanAbsDiff: +(sad / f0.length).toFixed(4), maxAbsDiff: mx, psnrDb: se === 0 ? 'identical' : +(10 * Math.log10(255 * 255 / (se / f0.length))).toFixed(2) };
-// Continuity at the true wrap point (t = 180.000, where the video loops): the jump from the
-// sample just before 180 s to sample 0, against the step statistics of the 0.5 s either side.
+// Continuity at the true wrap point (t = DURATION, where the video loops): the jump from the
+// sample just before the end to sample 0, against the step statistics of the 0.5 s either side.
 function wrap(inter, sr = 48000) {
-  const N = 180 * sr, W = sr / 2, steps = [];
+  const N = T.DURATION * sr, W = sr / 2, steps = [];
   const step = (i, j) => Math.max(Math.abs(inter[2 * i] - inter[2 * j]), Math.abs(inter[2 * i + 1] - inter[2 * j + 1]));
   for (let i = N - W; i < N; i++) steps.push(step(i, i - 1));
   for (let i = 1; i < W; i++) steps.push(step(i, i - 1));

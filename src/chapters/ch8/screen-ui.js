@@ -1,7 +1,8 @@
 // VIII · THE PROMPT: what the laptop's display shows, drawn with Canvas2D as a pure function of t.
+// (Times below are written against a chapter start of 160 s and re-anchored by D = start − 160.)
 //   159.2 → 168.0  a dark code editor: prompt.md typed character by character (T.typedCount),
 //                  soft-wrapped, markdown-tinted, auto-scrolled, with a warm block caret.
-//   168.0 → 171.6  a terminal: `$ node tools/render.mjs` and a progress bar to 10,800 / 10,800.
+//   168.0 → 171.6  a terminal (from T.ENTER_T): `$ node tools/render.mjs` and a progress bar.
 //   171.6 → …      a minimal video player whose picture is the film itself (composited in the
 //                  display shader from the recursion level below; the canvas only draws chrome).
 import { ED, CANVAS } from './layout.js';
@@ -15,13 +16,19 @@ const COL = {
 const CLS = [COL.text, COL.h1, COL.h2, COL.bullet, COL.roman, COL.num, COL.caps, COL.code, COL.path];
 const FALLBACK = /[\u2190-\u21ff\u2200-\u22ff]/;          // → ≤ … are not in the latin font subset
 
-export const PHASE = {
-  wake: [160.1, 161.0],          // display content fades up; before it only the caret is lit
-  terminal: 168.0,               // = T.ENTER_T
-  player: 171.6,                 // = T.renderBar.t1
-  playerOpen: 0.3,
-  full: [172.7, 173.45],         // player → fullscreen
-};
+/** Phase times, re-anchored to the chapter's start (D = VIII.start − 160). */
+export function makePhase(T) {
+  const D = T.chapterById.VIII.start - 160;
+  return {
+    D,
+    wake: [160.1 + D, 161.0 + D],  // display content fades up; before it only the caret is lit
+    terminal: T.ENTER_T,
+    player: T.renderBar.t1,
+    playerOpen: 0.3,
+    full: [172.7 + D, 173.45 + D], // player → fullscreen
+  };
+}
+let PHASE = null;
 
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
 const sstep = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
@@ -32,6 +39,7 @@ const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart
 export class ScreenUI {
   constructor(T, FONTS) {
     this.T = T; this.F = FONTS;
+    this.P = PHASE = makePhase(T);
     this.canvas = document.createElement('canvas');
     this.canvas.width = W; this.canvas.height = H;
     this.g = this.canvas.getContext('2d');
@@ -167,7 +175,7 @@ export class ScreenUI {
     // caret: solid through the hand-off, one soft blink before the first key, solid while typing
     let on = 1;
     if (t < T.typing.start) {
-      const b = t - 160.56;
+      const b = t - (160.56 + PHASE.D);
       on = 1 - sstep(0.0, 0.06, b) + sstep(0.26, 0.32, b);
       on = clamp01(on);
     }
@@ -312,7 +320,7 @@ export class ScreenUI {
     const T = this.T;
     const rb = T.renderBar;
     const u = clamp01((t - rb.t0) / (rb.t1 - rb.t0));
-    const frames = Math.floor(10800 * u + 1e-9);
+    const frames = Math.floor(T.FRAMES * u + 1e-9);
     // bar head pulse on each of the 12 render ticks (the SFX cues)
     let pulse = 0;
     for (let k = 0; k < 12; k++) { const tk = rb.t0 + (rb.t1 - rb.t0) * (k / 11); if (t >= tk) pulse = Math.max(pulse, Math.exp(-(t - tk) / 0.12)); }
@@ -344,7 +352,7 @@ export class ScreenUI {
     put([['~/Projects/origin-film', '#7fa6f0'], [' on ', '#5d6572'], ['main', '#c0a0f4']], y); y += lh;
     put([['$ ', '#a2d47c', 700], ['node tools/render.mjs', '#e6e9ee']], y); y += lh * 1.35;
     const rows = [
-      [['ORIGIN', '#ffdcae', 700], ['  10,800 frames · 1920×1080 · 60 fps · 8 workers', '#9aa3ae']],
+      [['ORIGIN', '#ffdcae', 700], [`  ${fmtInt(this.T.FRAMES)} frames · 1920×1080 · 60 fps · 8 workers`, '#9aa3ae']],
       [['gpu    ', '#5d6572'], ['ANGLE Metal Renderer: Apple M4', '#c5cbd3']],
       [['audio  ', '#5d6572'], ['renders/origin.wav · −14.0 LUFS · −1.5 dBTP', '#c5cbd3']],
       [['fonts  ', '#5d6572'], ['JetBrains Mono · Cormorant Garamond · Inter', '#c5cbd3']],
@@ -364,11 +372,11 @@ export class ScreenUI {
         g.fillRect(bx + fw - 6, by - 3 * pulse, 6, bh + 6 * pulse);
       }
       const pct = Math.floor(u * 100);
-      put([[' '.repeat(Math.ceil((bw + 36) / cw) + 2), '#000'], [`${fmtInt(frames).padStart(6)} / 10,800`, '#e6e9ee', 500], [`  ${String(pct).padStart(3)}%`, '#ffdcae', 500]], y);
+      put([[' '.repeat(Math.ceil((bw + 36) / cw) + 2), '#000'], [`${fmtInt(frames).padStart(6)} / ${fmtInt(this.T.FRAMES)}`, '#e6e9ee', 500], [`  ${String(pct).padStart(3)}%`, '#ffdcae', 500]], y);
       y += lh;
       const el = Math.max(0, (t - this.T.renderBar.t0)) * 360;
       const fps = frames > 0 ? frames / Math.max(1e-3, el) : 0;
-      const eta = frames > 0 ? (10800 - frames) / Math.max(1e-3, fps) : 0;
+      const eta = frames > 0 ? (this.T.FRAMES - frames) / Math.max(1e-3, fps) : 0;
       put([['  ', '#000'], [`${fps.toFixed(1)} fps · elapsed ${mmss(el)} · eta ${mmss(eta)}`, '#6d7582']], y);
       y += lh * 1.35;
     }
@@ -376,7 +384,7 @@ export class ScreenUI {
       // ✓ line
       g.strokeStyle = '#a2d47c'; g.lineWidth = 5; g.lineCap = 'round'; g.lineJoin = 'round';
       g.beginPath(); g.moveTo(x0 + 4, y - 14); g.lineTo(x0 + 12, y - 5); g.lineTo(x0 + 28, y - 27); g.stroke();
-      put([['  ', '#000'], ['renders/origin.mp4', '#8fd3c7'], ['  3:00 · 1920×1080 · 60 fps', '#9aa3ae']], y);
+      put([['  ', '#000'], ['renders/origin.mp4', '#8fd3c7'], [`  ${mmss(this.T.DURATION)} · 1920×1080 · 60 fps`, '#9aa3ae']], y);
       y += lh;
     }
     // prompt / caret
@@ -403,12 +411,12 @@ export class ScreenUI {
     st.mode = 'player';
     st.video = { x: r.x, y: r.y, w: r.w, h: r.h, alpha: r.open };
     const chrome = r.open * (1 - smoother(PHASE.full[0], PHASE.full[0] + 0.3, t));
-    const key = `p|${r.x.toFixed(2)}|${r.w.toFixed(2)}|${chrome.toFixed(3)}|${Math.floor(t)}|${(t / 180).toFixed(4)}`;
+    const key = `p|${r.x.toFixed(2)}|${r.w.toFixed(2)}|${chrome.toFixed(3)}|${Math.floor(t)}|${(t / this.T.DURATION).toFixed(4)}`;
     if (!this.begin(key)) return;
     st.changed = true;
     const g = this.g, F = this.F;
     // the terminal underneath, dimming as the player opens
-    if (r.open < 1) this.drawTerminal(t, 1, 10800, 6, 0, 1, 1);
+    if (r.open < 1) this.drawTerminal(t, 1, this.T.FRAMES, 6, 0, 1, 1);
     else { g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.fillStyle = '#000'; g.fillRect(0, 0, W, H); }
     g.globalAlpha = r.open;
     g.fillStyle = '#050608'; g.fillRect(0, 0, W, H);
@@ -425,10 +433,10 @@ export class ScreenUI {
       g.fillRect(190, cy - 17, 8, 30); g.fillRect(206, cy - 17, 8, 30);
       g.font = `500 24px ${F.mono}`; g.fillStyle = '#c5cbd3';
       g.fillText(mmss(t), 250, cy + 8);
-      g.textAlign = 'right'; g.fillText('3:00', W - 190, cy + 8); g.textAlign = 'left';
+      g.textAlign = 'right'; g.fillText(mmss(this.T.DURATION), W - 190, cy + 8); g.textAlign = 'left';
       const sx = 350, sw = W - 190 - 90 - sx;
       g.fillStyle = '#2a2f38'; g.fillRect(sx, cy - 3, sw, 6);
-      const px = sx + sw * (t / 180);
+      const px = sx + sw * (t / this.T.DURATION);
       g.fillStyle = '#e6e9ee'; g.fillRect(sx, cy - 3, px - sx, 6);
       g.beginPath(); g.arc(px, cy, 10, 0, 6.3); g.fill();
       g.globalAlpha = 1;

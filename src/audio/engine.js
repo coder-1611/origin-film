@@ -86,7 +86,7 @@ function ksData(sr, freq, seconds, seed, { bright = 0.5, t60 = 1.2, piano = fals
   return out;
 }
 
-/** The drone: additive sines on multiples of 1/180 Hz: exactly periodic over the film. */
+/** The drone: additive sines on whole cycles per film (multiples of 1/DURATION Hz): exactly periodic. */
 function droneData(sr) {
   const len = Math.floor(sr * T.DURATION), L = new Float32Array(len), R = new Float32Array(len);
   const P = T.DURATION;
@@ -101,7 +101,7 @@ function droneData(sr) {
       L[i] += s * gl; R[i] += s * gr;
     }
   }
-  // Gain envelope (wraps: g(180) = g(0)) + the digital silence.
+  // Gain envelope (wraps: g(DURATION) = g(0)) + the digital silence.
   for (let i = 0; i < len; i++) {
     const t = i / sr;
     let g = T.pwl(T.drone.gain, t);
@@ -692,7 +692,7 @@ export class ScoreEngine {
       this.buffers.drone = b;
     }
     const s = this.ctx.createBufferSource(); s.buffer = this.buffers.drone;
-    s.start(this.at(filmT), filmT);                       // stops by itself at 180 s
+    s.start(this.at(filmT), filmT);                       // stops by itself at the end of the film
     const wg = this.ctx.createGain(); wg.gain.value = 0.25;
     s.connect(this.droneBus); s.connect(wg); wg.connect(this.verbIn);
     return s;

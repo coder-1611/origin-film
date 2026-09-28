@@ -20,7 +20,9 @@ async function boot() {
   await document.fonts.ready;
   const canvas = document.getElementById('film');
   canvas.width = W; canvas.height = H;
-  const film = await new Film(canvas, { W, H, solo, quality: +(q.get('q') || 1) }).init();
+  // ?nofeat: audio features off (zeros), for exact A/B comparisons across audio re-renders.
+  const film = await new Film(canvas, { W, H, solo, quality: +(q.get('q') || 1), featuresUrl: q.has('nofeat') ? null : undefined }).init();
+  film.fixSeed = q.has('fixseed');   // A/B comparisons: grain/dither pattern independent of t
   window.__film = film;
   window.__seek = (t) => film.seek(t);
   window.__info = () => ({

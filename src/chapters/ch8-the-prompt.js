@@ -1,4 +1,5 @@
-// VIII · THE PROMPT (160.000 → 180.000)
+// VIII · THE PROMPT (T.chapterById.VIII.start → T.DURATION)
+// Time literals are written against a chapter start of 160 s and re-anchored by D = start − 160.
 // A laptop in a dark room, lit only by its display. The prompt is typed key by key (the keycaps
 // depress and flare on every character), Enter runs the render, and the display then shows the
 // film's own live output: a real recursive Droste. Each recursion level renders this scene with its
@@ -6,11 +7,13 @@
 // chain on it, and feeds the result upward. The camera pushes in until the 16:9 display fills the
 // frame exactly, where every level converges on frame 0 and the film loops.
 import { buildScene } from './ch8/scene.js';
-import { ScreenUI, PHASE } from './ch8/screen-ui.js';
+import { ScreenUI } from './ch8/screen-ui.js';
 import { DOF } from './ch8/dof.js';
 import * as L from './ch8/layout.js';
 
-const END_T = 179.98;          // from here the frame IS frame 0 (byte copy)
+let END_T = 179.98;            // T.DURATION − 0.02: from here the frame IS frame 0 (byte copy)
+let D = 0;                     // chapter start − 160 (set in init)
+let PHASE = null;
 const KMAX = 16;               // recursion depth cap
 const CLASSES = [1, 0.5, 0.25, 0.125];
 
@@ -29,24 +32,24 @@ function screenRadiance(t) {            // what the display pours into the room 
   const wake = smoother(PHASE.wake[0], PHASE.wake[1], t);
   let L0 = 0.05 + 1.05 * wake;
   L0 *= 1 + 0.35 * Math.exp(-Math.max(0, t - T.ENTER_T) / 0.35) * (t >= T.ENTER_T ? 1 : 0);
-  return L0 * (1 - smoother(178.2, 179.75, t));
+  return L0 * (1 - smoother(178.2 + D, 179.75 + D, t));
 }
-function roomLight(t) { return smoother(160.25, 161.6, t) * (1 - smoother(177.4, 179.5, t)); }
-function backlight(t) { return smoother(PHASE.wake[0] + 0.2, PHASE.wake[1] + 0.3, t) * (1 - 0.35 * smoother(168.2, 169.5, t)) * (1 - smoother(177.2, 179.3, t)); }
+function roomLight(t) { return smoother(160.25 + D, 161.6 + D, t) * (1 - smoother(177.4 + D, 179.5 + D, t)); }
+function backlight(t) { return smoother(PHASE.wake[0] + 0.2, PHASE.wake[1] + 0.3, t) * (1 - 0.35 * smoother(168.2 + D, 169.5 + D, t)) * (1 - smoother(177.2 + D, 179.3 + D, t)); }
 function aperture(t) {                  // blur radius at infinity, fraction of frame height
-  const a = T.pwl([[159.2, 0.058], [160.3, 0.058], [160.7, 0.030], [161.6, 0.017], [167.8, 0.015], [171.6, 0.013], [175.0, 0.011], [177.0, 0.007], [178.0, 0.0]], t);
+  const a = T.pwl([[159.2, 0.058], [160.3, 0.058], [160.7, 0.030], [161.6, 0.017], [167.8, 0.015], [171.6, 0.013], [175.0, 0.011], [177.0, 0.007], [178.0, 0.0]].map(([k, v]) => [k + D, v]), t);
   return a;
 }
 function cursorGlow(t) {                // HDR boost on the caret: a point of light, then a warm accent
   // defocused (159.2–160.0) its energy spreads over a bokeh disc, so it burns brighter; as the
   // focus racks in it settles to a warm accent that just kisses the bloom
-  return 1.0 + 7.0 * (1 - smoother(159.95, 160.5, t)) + 2.4 * (1 - smoother(160.4, 161.3, t));
+  return 1.0 + 7.0 * (1 - smoother(159.95 + D, 160.5 + D, t)) + 2.4 * (1 - smoother(160.4 + D, 161.3 + D, t));
 }
 /** Focus distance factor: the macro opens defocused on the caret (VII's point, as bokeh) and racks in. */
-function focusRack(t) { return 0.6 + 0.4 * smoother(159.95, 160.45, t); }
+function focusRack(t) { return 0.6 + 0.4 * smoother(159.95 + D, 160.45 + D, t); }
 
-// Local musical reactions: the leitmotif's piano notes (bars 72–74, the 176 s resolution) and
-// the bar-1 kicks of bars 68–71 swell the key backlight and the display-edge glow.
+// Local musical reactions: the leitmotif's piano notes (the rit bars and the final resolution) and
+// the bar-1 kicks before Enter swell the key backlight and the display-edge glow.
 let pianoNotes = [], kickTimes = [];
 function swell(list, t, tau, look = 3) {
   let v = 0;
@@ -84,7 +87,7 @@ function keyPresses(t, out) {
     const s = presses.shift[i];
     if (s >= 0) { const es = dt < atk ? dt / atk : Math.exp(-(dt - atk) / (rel * 1.8)); if (es > out[s]) out[s] = es; }
   }
-  // Enter at 168.000: a full, deliberate press
+  // Enter at T.ENTER_T: a full, deliberate press
   const de = t - T.ENTER_T + 0.015;
   if (de >= 0) out[keyIdxEnter] = Math.max(out[keyIdxEnter], de < 0.015 ? de / 0.015 : Math.exp(-(de - 0.015) / 0.14));
 }
@@ -146,7 +149,7 @@ function prepare(ctx, t) {
   const cool = st.mode === 'terminal' ? [0.86, 0.9, 1.0] : st.mode === 'player' ? [0.8, 0.84, 1.0] : [0.82, 0.88, 1.0];
   S.screenLight.color.setRGB(cool[0], cool[1], cool[2]);
   S.screenLight.intensity = rad;
-  S.glassUniforms.uBleed.value = rad * (0.035 + 0.05 * smoother(171.6, 173.0, t)) * (1 + 0.9 * swell(pianoNotes, t, 0.7)) * (1 - smoother(177.1, 178.4, t));
+  S.glassUniforms.uBleed.value = rad * (0.035 + 0.05 * smoother(171.6 + D, 173.0 + D, t)) * (1 + 0.9 * swell(pianoNotes, t, 0.7)) * (1 - smoother(177.1 + D, 178.4 + D, t));
   const room = roomLight(t);
   S.room.moon.intensity = S.room.moonI * room;
   S.room.warm.intensity = S.room.warmI * room;
@@ -213,13 +216,13 @@ function nestScale(prep) {
 }
 
 function postParams(t) {
-  const fin = smoother(177.2, 179.6, t);
+  const fin = smoother(177.2 + D, 179.6 + D, t);
   return {
-    exposure: 1.0 + 0.9 * smoother(171.4, 172.6, t) * (1 - smoother(177.6, 179.4, t)),
+    exposure: 1.0 + 0.9 * smoother(171.4 + D, 172.6 + D, t) * (1 - smoother(177.6 + D, 179.4 + D, t)),
     bloom: 0.62 * (1 - fin), threshold: 0.72, knee: 0.5, bloomRadius: 1.15,
     vignette: 0.42 * (1 - fin),
-    grain: 0.026 * (1 - smoother(170.6, 171.6, t)),
-    ca: 0.0012 * (1 - smoother(170.6, 171.5, t)),
+    grain: 0.026 * (1 - smoother(170.6 + D, 171.6 + D, t)),
+    ca: 0.0012 * (1 - smoother(170.6 + D, 171.5 + D, t)),
     lift: 0, saturation: 1.0, tint: [1, 1, 1],
   };
 }
@@ -229,8 +232,11 @@ export default {
 
   async init(ctx) {
     ({ T, THREE } = ctx);
+    D = T.chapterById.VIII.start - 160;
+    END_T = T.DURATION - 0.02;
     S = buildScene(ctx);
     ui = new ScreenUI(T, ctx.FONTS);
+    PHASE = ui.P;
     uiTex = new THREE.CanvasTexture(ui.canvas);
     uiTex.colorSpace = THREE.NoColorSpace;
     uiTex.generateMipmaps = true;
@@ -240,8 +246,8 @@ export default {
     camera = new THREE.PerspectiveCamera(30, ctx.aspect, 0.01, 12);
     dof = new DOF(ctx);
     presses = buildPresses();
-    pianoNotes = T.notesIn('piano', 159, 181).map(n => ({ t: n.t, vel: n.vel }));
-    kickTimes = T.kicks.filter(k => k >= 159 && k < 181).map(k => ({ t: k, vel: 1 }));
+    pianoNotes = T.notesIn('piano', 159 + D, 181 + D).map(n => ({ t: n.t, vel: n.vel }));
+    kickTimes = T.kicks.filter(k => k >= 159 + D && k < 181 + D).map(k => ({ t: k, vel: 1 }));
     // warm up: allocate the full-res level and compile every program once
     pool(ctx, 1);
     ctx.renderer.compile(S.scene, camera);

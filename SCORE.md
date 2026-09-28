@@ -15,10 +15,10 @@ scheduled live for the player.
 | III · First Light | 8–17 | 32–58 | D minor, 84→101.5 | Pads, FM-bell star births, leitmotif on bells (12–13), riser + kick on every beat in bar 17 |
 | IV · Accretion | 18–28 | 58–81.99 | D minor → pivot, 101.5→118.6 | Drums in, arpeggiated plucks, riser bar 22, **Theia IMPACT 23.1**, ring/moon pads, C (V of F) in 27–28 |
 | V · Pale Blue | 29–40 | 81.99–106 | **F major**, 118.6→120 | Open pads, Karplus-Strong arpeggios, soft kick 33–38, whoosh 37, splash 39.1, bubbles |
-| VI · Life | 41–54 | 106–134 | F major, 120 | Marimba ostinato + leitmotif, cell-division pops, soft four-on-the-floor from 45, hats; the march: footsteps on the beat grid, animal calls, the torch |
-| VII · Fire to Fiber | 55–67 | 134–160 | F major, 120 | Full drums, sub bass, **supersaw lead leitmotif**, crackle, clanks, hiss, arc zaps |
-| VIII · The Prompt | 68–74 | 160–176 | → D minor, 120 → rit. → 60 | Typing: keyclicks accelerating into a granular riser; Enter 72.1; leitmotif on piano-pluck |
-| (coda) | — | 176–180 | D, free | Drone returns; final E→D resolution; loops to 0:00 |
+| VI · Life | 41–64 | 106–154 | F major, 120 | Marimba ostinato + leitmotif, cell-division pops, soft four-on-the-floor from 45, hats; the march: footsteps on the beat grid, animal calls, the torch |
+| VII · Fire to Fiber | 65–77 | 154–180 | F major, 120 | Full drums, sub bass, **supersaw lead leitmotif**, crackle, clanks, hiss, arc zaps |
+| VIII · The Prompt | 78–84 | 180–196 | → D minor, 120 → rit. → 60 | Typing: keyclicks accelerating into a granular riser; Enter 82.1; leitmotif on piano-pluck |
+| (coda) | — | 196–200 | D, free | Drone returns; final E→D resolution; loops to 0:00 |
 
 ## Tempo map (exact, in `timeline.tempo`)
 
@@ -26,9 +26,9 @@ scheduled live for the player.
  0.0000 – 12.0000   free time (no grid)
 12.0000 – 33.3509   84 BPM
 33.3509 – 83.9824   linear accelerando 84 → 120 BPM
-83.9824 – 168.0000  120 BPM
-168.0000 – 176.0000 linear ritardando 120 → 60 BPM
-176.0000 – 180.0000 free time
+83.9824 – 188.0000  120 BPM
+188.0000 – 196.0000 linear ritardando 120 → 60 BPM
+196.0000 – 200.0000 free time
 ```
 The breakpoints were solved numerically so that bars 18, 29 and 41 land on 58.000 s,
 81.988 s and 106.000 s.
@@ -40,29 +40,30 @@ II   1 Dm   2 Dm   3 Bb   4 F    5 C    6 Gm   7 A7sus4→A
 III  8 Dm9  9 Dm  10 Bbmaj7 11 Bb 12 Gm9 13 Gm 14 Dm/F 15 Bb 16 C 17 A
 IV  18 Dm  19 Dm  20 Bb  21 C   22 A   23 Dm  24 Bb  25 Gm  26 Dm  27 C  28 C7
 V   29 F   30 C/E 31 Dm  32 Bb  33 F   34 C   35 Bb  36 Bb  37 Gm  38 C  39 F  40 F
-VI  41 F   42 Am  43 Bb  44 C   45 F   46 Am  47 Bb  48 C   49 Dm  50 Bb 51 F 52 C 53 Bb 54 C
-VII 55 F   56 C   57 Dm  58 Bb  59 F   60 C   61 Bb  62 C   63 Dm  64 Bb 65 F/A 66 Gm 67 C
-VIII 68 Bb 69 Gm  70 Bb  71 A   72 Dm  73 Bb  74 Gm→A   (176) D
+VI  41 F   42 Am  43 Bb  44 C   45 F   46 Am  47 Bb  48 C   49 Dm  50 Bb  51 F   52 C
+    53 Dm  54 Bb  55 F   56 C   57 Dm  58 Bb  59 F   60 C   61 Dm  62 Gm  63 Bb  64 C
+VII 65 F   66 C   67 Dm  68 Bb  69 F   70 C   71 Bb  72 C   73 Dm  74 Bb 75 F/A 76 Gm 77 C
+VIII 78 Bb 79 Gm  80 Bb  81 A   82 Dm  83 Bb  84 Gm→A   (196) D
 ```
 
 ## Leitmotif
 
 Five notes, scale degrees **1 5 4 3 2** with the rhythm long, short, short, short, long,
-unresolved on purpose. It resolves only once, on the last note of the film (E → D at 176 s),
+unresolved on purpose. It resolves only once, on the last note of the film (E → D at 196 s),
 which is also the first sound of the loop.
 
 | Statement | Where | Pitches | Voice |
 |---|---|---|---|
 | 1 | I, 3.0–7.0 s (free) | D4 A4 G4 F4 E4 | pure sine, long reverb; each note reveals a title glyph |
 | 2 | III bars 12–13 | D5 A5 G5 F5 E5 | FM bells (ratio 3.5, index decays) |
-| 3 | VI bars 45–48 (×2) | F4 C5 Bb4 A4 G4 | marimba (modal, 3 partials) |
-| 4 | VII bars 55–62 (×2 + answer) | F4 C5 Bb4 A4 G4 | supersaw lead, harmonised in 3rds on the repeat |
-| 5 | VIII bars 72–74 → 176 | D4 A4 G4 F4 E4 → **D4** | Karplus-Strong piano-like pluck, ritardando |
+| 3 | VI bars 45–48 (×2), and again at 59 as the mammals arrive | F4 C5 Bb4 A4 G4 | marimba (modal, 3 partials) |
+| 4 | VII bars 65–72 (×2 + answer) | F4 C5 Bb4 A4 G4 | supersaw lead, harmonised in 3rds on the repeat |
+| 5 | VIII bars 82–84 → 196 | D4 A4 G4 F4 E4 → **D4** | Karplus-Strong piano-like pluck, ritardando |
 
 ## Instruments (all in `src/audio/engine.js`)
 
-* **Drone:** additive sines whose frequencies are multiples of 1/180 Hz (D1 ≈ 36.711 Hz), with
-  amplitude LFOs also on 1/180 Hz multiples, so the drone is exactly periodic over the film.
+* **Drone:** additive sines, each rounded to a whole number of cycles over the film (D1 ≈ 36.71 Hz), with
+  amplitude LFOs also on whole cycles, so the drone is exactly periodic over the film.
 * **Sine lead:** a sine plus a gentle vibrato and long reverb send.
 * **FM bell:** carrier + modulator (ratio 3.5), decaying modulation index. It plays star births and the motif.
 * **Supersaw:** 7 detuned saws → lowpass with an envelope, used for the pad (slow attack) and the lead.
@@ -81,7 +82,7 @@ which is also the first sound of the loop.
   and panned to the walker: a wet slap (tetrapod), soft pads (amphibian, mammal), a 16th-note patter
   (reptile), a sub-bass stomp on every kick (dinosaur), knuckles (ape), and bare feet on sand
   (human). Calls: a pulsed formant croak, a hiss, an FM-growl roar through a waveshaper on the
-  bar-51 downbeat, rising chirps, and a breathy two-note hoot. The torch catches with a whoosh
+  bar-57 downbeat (and again on bar 58), rising chirps, and a breathy two-note hoot. The torch catches with a whoosh
   and its own granular crackle, which hands over to VII's fire.
 
 ## Mix
@@ -100,6 +101,6 @@ which is also the first sound of the loop.
 
 ## Loop
 
-Rendering runs to 186 s, and the tail past 180 s is folded (added) back onto the start, so reverb
-and the limiter see the wrap as continuous. The drone is exactly 180 s-periodic. The last 4 s are
+Rendering runs to 206 s, and the tail past 200 s is folded (added) back onto the start, so reverb
+and the limiter see the wrap as continuous. The drone is exactly periodic over the film's 200 s. The last 4 s are
 drone plus the resolving pluck, so the fold is gentle.

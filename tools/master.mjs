@@ -5,13 +5,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT } from './lib/serve.mjs';
 import { readF32, writeWavF32, integratedLoudness, truePeakDb, glueCompress, tpLimit } from './lib/dsp.mjs';
+const T = await import(path.join(ROOT, 'src/timeline.js'));
 
-const SR = 48000, DUR = 180, TARGET = -14, CEIL = -1.5;
+const SR = 48000, DUR = T.DURATION, TARGET = -14, CEIL = -1.5;
 const raw = readF32(path.join(ROOT, 'renders/score-raw.f32'));
 const n = DUR * SR;
 let x = new Float32Array(n * 2);
 x.set(raw.subarray(0, n * 2));
-for (let i = n * 2; i < raw.length; i++) x[i - n * 2] += raw[i];           // fold the tail (180–186 s) onto 0–6 s
+for (let i = n * 2; i < raw.length; i++) x[i - n * 2] += raw[i];           // fold the tail (past the end) onto the start
 console.log('raw   LUFS', integratedLoudness(x).toFixed(2), ' TP', truePeakDb(x).toFixed(2), 'dBTP');
 
 x = glueCompress(x, SR, { threshold: -20, ratio: 2.2, attack: 0.025, release: 0.3 });

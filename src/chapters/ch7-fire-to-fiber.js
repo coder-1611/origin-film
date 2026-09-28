@@ -38,6 +38,18 @@ const sm5 = (a, b, x) => { const u = sat((x - a) / (b - a)); return u * u * u * 
 
 let S = null;   // chapter state (built once in init; nothing in it depends on render history)
 
+// ---- Chapter-local clock. Every authored time in this chapter (and in ch7/*.js) is written on
+// the clock where VII starts at 134 s. D re-anchors it to the timeline: tl = t − D. All
+// timeline queries go through TL (which adds D back), and the event lists are copied into
+// local time once in init, so the chapter is exactly shift-invariant, oscillators included.
+let D = 0;
+const TL = {
+  friezeX: (T, wx, tl) => T.friezeX(wx, tl + D),
+  friezeCamX: (T, tl) => T.friezeCamX(tl + D),
+  globeView: (T, tl) => T.globeView(tl + D),
+  globeProject: (T, tl, lat, lon) => T.globeProject(tl + D, lat, lon),
+};
+
 // ------------------------------------------------------------------ compile the drawings
 function compile(T) {
   const rng = T.mulberry32(0xF1BE7);
@@ -47,11 +59,11 @@ function compile(T) {
   // truck solve: time at which friezeX(wx, t) = x (monotone truck)
   const tAtX = (wx, x) => {
     let lo = 120, hi = 170;
-    if (T.friezeX(wx, lo) <= x) return lo;
-    for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; T.friezeX(wx, m) > x ? lo = m : hi = m; }
+    if (TL.friezeX(T, wx, lo) <= x) return lo;
+    for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; TL.friezeX(T, wx, m) > x ? lo = m : hi = m; }
     return (lo + hi) / 2;
   };
-  const defs = T.frieze.items.map(it => ({ ...it, mod: mods[it.name] }));
+  const defs = T.frieze.items.map(it => ({ ...it, t0: it.t0 - D, t1: it.t1 - D, mod: mods[it.name] }));
   // interludes between the plates (decoration; positions are ours, motion is the same truck)
   // each sits in the right third of a plate's hold and draws once that plate is done
   defs.push({ name: 'jar', wx: 0.72, mod: { build: INTER.buildJar }, deco: true, host: 'fire' });
@@ -65,7 +77,7 @@ function compile(T) {
     // must exist before its first clank (the window's first instant), so its machinery is
     // laid down in the 0.9 s it takes to settle into the hold; its details finish after.
     let drawS, drawE;
-    const firstClank = (T.sfx.find(e => e.type === 'clank') || { t: it.t0 }).t;
+    const firstClank = (T.sfx.find(e => e.type === 'clank') || { t: it.t0 + D }).t - D;
     if (it.name === 'fire') { drawS = it.t0; drawE = it.t0 + 1.75; }
     else if (it.name === 'press') { drawS = firstClank - 0.9; drawE = drawS + 1.8; }
     else if (it.ground) { drawS = 134.9; drawE = 136; }
@@ -276,6 +288,9 @@ export default {
 
   async init(ctx) {
     const { THREE, T, W, H, makeTarget, Pass } = ctx;
+    // (rounded to the ms: timeline shifts are exact, this strips bt()'s float noise so the
+    // local clock is bit-identical to the one the chapter was authored on)
+    D = Math.round((T.chapterById.VII.start - 134) * 1000) / 1000;
     const cmp = compile(T);
     const mask = landMask(2048, 1024);
     const lights = buildLights(T, mask, T.mulberry32(0x516E7));
@@ -307,11 +322,11 @@ export default {
       seg: new SegBatch(ctx, 160000, 'max'),
       spr: new SpriteBatch(ctx, 40000),
       scratch: [0, 0],
-      kicks: T.kicks,
-      lead: T.notes.filter(n => n.inst === 'lead'),
-      clanks: T.sfx.filter(e => e.type === 'clank').map(e => e.t),
-      hiss: T.sfx.filter(e => e.type === 'hiss').map(e => e.t),
-      whoosh: (T.sfx.find(e => e.type === 'whoosh' && Math.abs(e.t - T.frieze.items[1].t0) < 0.6) || { t: T.frieze.items[1].t0 }).t,
+      kicks: T.kicks.map(k => k - D),
+      lead: T.notes.filter(n => n.inst === 'lead').map(n => ({ t: n.t - D, vel: n.vel })),
+      clanks: T.sfx.filter(e => e.type === 'clank').map(e => e.t - D),
+      hiss: T.sfx.filter(e => e.type === 'hiss').map(e => e.t - D),
+      arcs: T.arcs.map(a => ({ ...a, t: a.t - D })),
       cityU: T.cities.map(([, la, lo]) => unit(la, lo)),
     };
     S.rrIdx = T.cities.findIndex(c => c[0] === 'Round Rock');
@@ -332,17 +347,18 @@ export default {
       const list = press.strokes.filter(s => s.printed === k);
       list.forEach((s, i) => { const tc = S.clanks[k] ?? press.t0; const u = i / Math.max(1, list.length); s.ta = tc + 0.03 + u * 0.36; s.tb = s.ta + 0.05; });
     }
-    S.friezeXFn = T.friezeX;
+    S.friezeXFn = (wx, tl) => TL.friezeX(T, wx, tl);
     ctx0 = ctx;
     buildUnspool(ctx, T);
   },
 
-  render(ctx, t, target) {
+  render(ctx, tAbs, target) {
     const { renderer: r, W, H, T } = ctx;
+    const t = tAbs - D;                                   // chapter-local clock
     const sc = H / 1080;
     S.seg.begin(); S.spr.begin();
     S.bk = null;
-    const env = envelopes(ctx, t);
+    const env = envelopes(ctx, t, tAbs);
 
     const friezeOn = t < 151.2;
     const globeOn = t > 148.95;
@@ -355,9 +371,9 @@ export default {
     if (globeOn) G = drawGlobe(ctx, t, env, sc);
 
     // ---- background
-    const camX = T.friezeCamX(t);
+    const camX = TL.friezeCamX(T, t);
     const gT = sm5(149.3, 150.6, t);
-    const view = T.globeView(t);
+    const view = TL.globeView(T, t);
     S.bgPass.render(r, S.bgT, {
       camX, friezeAmt: 1 - gT, gridAmt: sstep(133.8, 135.5, t) * (1 - sstep(148.6, 149.6, t)), globeAmt: gT, fireAmt, t,
       fireP: new ctx.THREE.Vector2(fireP[0], fireP[1]),
@@ -395,7 +411,8 @@ export default {
     r.setRenderTarget(null);
   },
 
-  post(t) {
+  post(tAbs) {
+    const t = tAbs - D;
     const g = sm5(149.5, 151, t);
     return {
       bloom: 0.62 - 0.1 * g, threshold: 1.0, knee: 0.6, bloomRadius: 1.0,
@@ -403,12 +420,13 @@ export default {
     };
   },
 
-  drawUI(g, t, alpha, ui) {
+  drawUI(g, tAbs, alpha, ui) {
     if (!S) return;
+    const t = tAbs - D;
     // Round Rock's label while the arcs converge (gone before the single-point hand-off)
     const la = sstep(157.15, 157.6, t) * (1 - sstep(158.45, 158.85, t)) * alpha;
     if (la > 0.003) {
-      const c = ctx0.T.cities[S.rrIdx], p = ctx0.T.globeProject(t, c[1], c[2]);
+      const c = ctx0.T.cities[S.rrIdx], p = TL.globeProject(ctx0.T, t, c[1], c[2]);
       const x = (p.x * 0.5 + 0.5) * 1920, y = (0.5 - p.y * 0.5) * 1080;
       g.save();
       g.strokeStyle = `rgba(255,236,210,${(0.45 * la).toFixed(3)})`; g.lineWidth = 1;
@@ -443,7 +461,7 @@ const PLATES = {
 let ctx0 = null;
 
 // ------------------------------------------------------------------ envelopes (music)
-function envelopes(ctx, t) {
+function envelopes(ctx, t, tAbs) {
   const K = S.kicks;
   let lo = 0, hi = K.length;
   while (lo < hi) { const m = (lo + hi) >> 1; if (K[m] <= t) lo = m + 1; else hi = m; }
@@ -451,7 +469,7 @@ function envelopes(ctx, t) {
   for (let i = lo - 1; i >= Math.max(0, lo - 3); i--) kick += Math.exp(-(t - K[i]) / 0.13);
   let lead = 0;
   for (const n of S.lead) { const d = t - n.t; if (d >= 0 && d < 0.8) lead += n.vel * Math.exp(-d / 0.24); }
-  const feat = ctx.features.at(t);
+  const feat = ctx.features.at(tAbs);                    // audio analysis runs on absolute time
   return { kick, lead, feat };
 }
 
@@ -560,7 +578,7 @@ function clipEmit(x0, y0, x1, y1, rects, ri, u0, u1, emit) {
 }
 
 function itemAnchor(ctx, it, t) {
-  const ax = ctx.T.friezeX(it.wx, t);
+  const ax = TL.friezeX(ctx.T, it.wx, t);
   return [(ax * 0.5 + 0.5) * ctx.W, ctx.H * 0.5];
 }
 
@@ -626,7 +644,7 @@ function drawFrieze(ctx, t, env, sc) {
     if (t < it.drawS - 0.05 && it.name !== 'fire') continue;
     // the engine hands its lines to the globe from 149 s
     const eng = it.name === 'engine';
-    if (eng && t > 149.0) continue;
+    if (eng && t >= 149.0) continue;                     // (at exactly 149.0 the unspool already draws it)
     const pose = itemPose(it, t, env);
     const alpha = eng ? 1 : 1 - sstep(148.9, 149.6, t);
     if (alpha <= 0.001) continue;
@@ -812,14 +830,14 @@ function buildUnspool(ctx, T) {
     }
   });
   // angles at the moment of the hand-over
-  const tRef = 150.0, v = T.globeView(tRef), R = viewRot(v), o = [0, 0, 0];
+  const tRef = 150.0, v = TL.globeView(T, tRef), R = viewRot(v), o = [0, 0, 0];
   const pieceAng = pieces.map((p, i) => {
     let sx = 0, sy = 0, sz = 0;
     for (let j = 0; j < K; j++) { toView(R, p.pts[j * 3], p.pts[j * 3 + 1], p.pts[j * 3 + 2], o); sx += o[0]; sy += o[1]; sz += o[2]; }
     return { i, a: Math.atan2(sy, sx), front: sz > 0 };
   });
   const tS = 149.2, pose = itemPose(eng, tS, { kick: 0, lead: 0, feat: { rms: 0 } });
-  const [AX] = [(T.friezeX(eng.wx, tS) * 0.5 + 0.5) * ctx.W];
+  const [AX] = [(TL.friezeX(T, eng.wx, tS) * 0.5 + 0.5) * ctx.W];
   const strokeInfo = rest.map((si) => {
     const st = strokes[si], M = pose.M[st.g] || AFF_ID;
     let sx = 0, sy = 0, c = 0;
@@ -846,7 +864,7 @@ function buildUnspool(ctx, T) {
 function drawGlobe(ctx, t, env, sc) {
   const { W, H, T } = ctx;
   const aspect = W / H;
-  const v = T.globeView(t);
+  const v = TL.globeView(T, t);
   const R = viewRot(v);
   const rN = v.r;                          // radius in half-heights
   const toPx = (x, y, out) => { out[0] = (x * rN / aspect * 0.5 + 0.5) * W; out[1] = (y * rN * 0.5 + 0.5) * H; };
@@ -964,7 +982,7 @@ function drawGlobe(ctx, t, env, sc) {
   const L = S.lights;
   const lightsOn = t - 150.05;
   const cityFlash = new Float32Array(T.cities.length);
-  for (const a of T.arcs) {
+  for (const a of S.arcs) {
     const tl = a.t + a.dur * 0.92, x = t - tl;
     if (x >= 0 && x < 1.2) cityFlash[a.to] += Math.exp(-x / 0.35);
   }
@@ -998,7 +1016,7 @@ function drawGlobe(ctx, t, env, sc) {
 
   // ---- arcs (great circles lifted ∝ distance), fibre pulses, landing flashes
   const arcOut = 1 - sstep(158.85, 159.17, t);
-  for (const a of T.arcs) {
+  for (const a of S.arcs) {
     const tl = a.t + a.dur * 0.92;
     const life = a.converge ? 4.0 : 2.4;
     if (t < a.t || t > tl + life || arcOut <= 0) continue;

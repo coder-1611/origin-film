@@ -6,6 +6,8 @@
 //   --out dir         output directory       --png   lossless PNG instead of JPEG
 //   --sheet           also write a contact sheet (sheet.jpg) of the grabs
 //   --determinism     re-render each t after a random seek and compare pixels
+//   --nofeat          audio features off (zeros): exact A/B comparisons across audio re-renders
+//   --fixseed         grain/dither seed fixed at 0 (so a frame doesn't depend on its frame number)
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -36,7 +38,7 @@ if (!times.length) { console.log('no times given'); process.exit(1); }
 const { srv, url } = await serve();
 const browser = await launch();
 try {
-  const { page, info } = await openFilm(browser, url, { W, H, solo: args.solo });
+  const { page, info } = await openFilm(browser, url, { W, H, solo: args.solo, extraQuery: (args.nofeat ? '&nofeat=1' : '') + (args.fixseed ? '&fixseed=1' : '') });
   console.log('GPU:', info.gpu, '| chapters:', JSON.stringify(info.chapters), '| features:', info.features);
   const type = args.png ? 'png' : 'jpeg';
   const files = [];

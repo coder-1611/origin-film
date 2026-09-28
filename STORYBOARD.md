@@ -1,15 +1,15 @@
 # ORIGIN — Storyboard
 
-13.8 billion years in one unbroken camera move. 180.000 s, 1920×1080, 60 fps
-(10,800 frames; frame *n* shows *t = n/60*; the last frame, n = 10799, is pixel-identical
+13.8 billion years in one unbroken camera move. 200.000 s (3:20), 1920×1080, 60 fps
+(12,000 frames; frame *n* shows *t = n/60*; the last frame, n = 11999, is pixel-identical
 to frame 0).
 
 Every time in this document is also a value in `src/timeline.js`, which is the source of
 truth. If this document and the code disagree, the code wins, and this document gets fixed.
 
 **Musical grid.** Bar 1 is the Big Bang at 12.000 s. Tempo is 84 BPM through bar 8,
-accelerating linearly to 120 BPM (33.351 s → 83.982 s), 120 BPM until 168.000 s, then a
-ritardando to 60 BPM (168 → 176 s), then free time. Chapter boundaries are downbeats.
+accelerating linearly to 120 BPM (33.351 s → 83.982 s), 120 BPM until 188.000 s, then a
+ritardando to 60 BPM (188 → 196 s), then free time. Chapter boundaries are downbeats.
 
 | # | Chapter | In | Out | Bars | Technique (the one this chapter shows off) |
 |---|---|---|---|---|---|
@@ -18,9 +18,9 @@ ritardando to 60 BPM (168 → 176 s), then free time. Chapter boundaries are dow
 | III | FIRST LIGHT | 32.000 | 58.000 | 8–17 | Volumetric fbm raymarch + god rays → density-wave galaxy |
 | IV | ACCRETION | 58.000 | 81.988 | 18–28 | Three.js scene graph, custom bloom + DOF + grain |
 | V | PALE BLUE | 81.988 | 106.000 | 29–40 | Procedural planet: terrain, ocean glint, atmospheric scattering, clouds |
-| VI | LIFE | 106.000 | 134.000 | 41–54 | Gray-Scott reaction-diffusion → growing forest → boids → the evolution march |
-| VII | FIRE TO FIBER | 134.000 | 160.000 | 55–67 | SVG path draw-on → night-Earth with great-circle arcs |
-| VIII | THE PROMPT | 160.000 | 180.000 | 68–74 + free | UI compositing + real recursive feedback (Droste) |
+| VI | LIFE | 106.000 | 154.000 | 41–64 | Gray-Scott reaction-diffusion → growing forest → boids → the evolution march |
+| VII | FIRE TO FIBER | 154.000 | 180.000 | 65–77 | SVG path draw-on → night-Earth with great-circle arcs |
+| VIII | THE PROMPT | 180.000 | 200.000 | 78–84 + free | UI compositing + real recursive feedback (Droste) |
 
 **No hard cuts.** Every hand-off is a match-move, a scale dissolve, or an object becoming
 the next scene's object. A single-frame jump is allowed only on a storyboarded beat, and
@@ -33,7 +33,7 @@ all of them are data in `timeline.js`:
 `tools/verify/cuts.mjs` checks the delivered MP4 for isolated jumps, A→B→A dropouts and
 hand-off windows.
 
-**HUD.** Present from 1.0 s (fade in to 2.5 s) until 174 s (fade out by 175.5 s). Bottom-left:
+**HUD.** Present from 1.0 s (fade in to 2.5 s) until 194 s (fade out by 195.5 s). Bottom-left:
 a thin rule, the chapter label (`II · INFLATION`), and the year counter in JetBrains Mono,
 ticking down on a piecewise log scale (anchors in `timeline.hud.anchors`). Below one year
 it counts days → hours → minutes → seconds, and it reads **NOW** on the last keystroke.
@@ -122,22 +122,22 @@ and V starts molten and cools.
 **Out → VI (105.0–107.0):** a shared teal underwater field with caustics. VI's cells bloom
 inside it.
 
-## VI · LIFE — 106.000 → 134.000 (bars 41–54, 120 BPM)
+## VI · LIFE — 106.000 → 154.000 (bars 41–64, 120 BPM)
 
 | t | Beat |
 |---|---|
 | 106 (41.1) | Macro underwater. **Reaction-diffusion cells** bloom: translucent, lit membranes. Every `timeline.cellDivisions` event (106–111.4) seeds a split at its (x, y), heard as a pop pitched to the chord. |
-| 106–113.5 (41–44) | Colonies divide. The camera pulls back to show mats on shallow rock, then rises through the surface; the meniscus sweeps down the frame. |
-| 114–120 (45–47) | **Over-under shot** at the waterline. Above it, a **forest sprouts naturally**: seedlings, then saplings, then young trees, with buds unfolding into leaves on the marimba (`timeline.leafFlushes`, bars 45–47, motif flushes most prominent). Below it, stromatolites and kelp. |
-| 120–121 (48) | A **fish school** gathers below the waterline. |
-| **121.0 (48.3)** | **The breach.** Fish leap the surface and become birds as they cross the waterline. The flock rises into the sky and stays there as a murmuration over the sunset. |
-| 122.5–133 (49–54) | **The march.** On the shore at golden hour, sun on the horizon at centre, a procession walks left to right toward it, silhouetted, each stage the lead walker in turn (`timeline.march`): tetrapod hauling out of the water (122.5), amphibian (124), reptile (125), **dinosaur** (126, a roar on the bar-51 downbeat, stomping on every beat), small mammal (128), ape (129), **early human** (130). Every footstep in `timeline.footsteps` is a foot planting at that instant, panned to `marchX(t)`. |
-| 132–133 | The human stops at the exact centre in front of the setting sun, raises a torch, and it **catches at 133.0**. |
-| 133–134 | Night falls. The human and the land sink into darkness; the torch flame remains, a small ember at the exact centre. |
+| 106–114 (41–44) | Colonies divide. The camera pulls back to show mats on shallow rock, then rises through the surface; the meniscus sweeps down the frame. |
+| 114–124 (45–49) | **Over-under shot** at the waterline. Above it, a **forest sprouts naturally**: space-colonization trees grow from seedlings to young trees, tip growth plus thickening, buds unfolding into leaves on the marimba (`timeline.leafFlushes`, bars 45–49; motif flushes at bars 45 and 47 most prominent). Below it, stromatolites and kelp. |
+| 124–126 (50) | A **fish school** gathers below the waterline. |
+| **126.0 (51.1)** | **The breach.** Fish leap the surface and become birds as they cross the waterline. The flock rises into the sky and stays there as a murmuration over the sunset. |
+| 128–150 (52–62) | **The march.** On the shore at golden hour, sun on the horizon at centre, one intricate silhouette walks left to right toward it and evolves as it goes (`timeline.march`): tetrapod hauling out of the water (128, a small splash), amphibian (131, croak), reptile (134, hiss), **dinosaur** (138, a roar on the bar-57 downbeat and another at 140, stomping on every beat), small mammal (142, chirps, the marimba motif returns), ape (145, hoot), **early human** (148). Every footstep in `timeline.footsteps` (86 of them) is a foot planting at that instant, panned to `marchX(t)`. |
+| 150–151 (63) | The human stops at the exact centre in front of the setting sun and raises a torch. It **catches at 151.0**; the sun's last glint hands its light to the flame. |
+| 151–154 (63–64) | Night falls. The human and the land sink into darkness; the torch flame remains, a small ember at the exact centre. |
 
-**Out → VII (133.0–135.0):** the torch's flame, the first fire humans made, *becomes* the ember that the fire drawing grows from.
+**Out → VII (153.0–155.0):** the torch's flame, the first fire humans made, *becomes* the ember that the fire drawing grows from.
 
-## VII · FIRE TO FIBER — 134.000 → 160.000 (bars 55–67, 120 BPM)
+## VII · FIRE TO FIBER — 154.000 → 180.000 (bars 65–77, 120 BPM)
 
 Glowing amber line-art on warm black: SVG path data drawn on with animated dash offsets.
 The camera trucks right along one continuous frieze. It holds on each plate while that plate
@@ -146,35 +146,35 @@ anthem plays.
 
 | t | Beat |
 |---|---|
-| 134–138 (55–56) | **Fire:** flames draw themselves from the ember, then flicker. Synthesised crackle is panned to the flames. |
-| 138–142 (57–58) | **Wheel:** drawn on, then it rolls. |
-| 142–146 (59–60) | **Printing press:** the platen stamps on beats 1 and 3, with a metallic FM clank. |
-| 146–150 (61–62) | **Steam engine:** the flywheel spins, the piston pumps on every beat, steam hisses. |
-| 149–151 | The engine's lines unspool into latitude/longitude lines that wrap into a wireframe globe. |
-| 150–157 (63–66) | **Night Earth:** city lights at real coordinates. Great-circle arcs light up on the 8th notes, each with a zap panned to its landing city's screen x. Data pulses run along the fibres. |
-| 157–160 (66.2–67) | Every arc converges on **Round Rock, Texas**. The camera zooms into that light until it is a single point at the exact centre (159.2–160). |
+| 154–158 (65–66) | **Fire:** flames draw themselves from the ember, then flicker. Synthesised crackle is panned to the flames. |
+| 158–162 (67–68) | **Wheel:** drawn on, then it rolls. |
+| 162–166 (69–70) | **Printing press:** the platen stamps on beats 1 and 3, with a metallic FM clank. |
+| 166–170 (71–72) | **Steam engine:** the flywheel spins, the piston pumps on every beat, steam hisses. |
+| 169–171 | The engine's lines unspool into latitude/longitude lines that wrap into a wireframe globe. |
+| 170–177 (73–76) | **Night Earth:** city lights at real coordinates. Great-circle arcs light up on the 8th notes, each with a zap panned to its landing city's screen x. Data pulses run along the fibres. |
+| 177–180 (76.2–77) | Every arc converges on **Round Rock, Texas**. The camera zooms into that light until it is a single point at the exact centre (179.2–180). |
 
-**Out → VIII (159.2–160.6):** that city light *becomes* the blinking text cursor.
+**Out → VIII (179.2–180.6):** that city light *becomes* the blinking text cursor.
 
-## VIII · THE PROMPT — 160.000 → 180.000 (bars 68–74 + free time)
+## VIII · THE PROMPT — 180.000 → 200.000 (bars 78–84 + free time)
 
 Three.js dark room: a laptop on a desk, lit only by its screen.
 
 | t | Beat |
 |---|---|
-| 160.0 (68.1) | Macro on the blinking cursor. The camera pulls back 160 → 161.5 to reveal the editor, the laptop and the room. |
-| 161.0 → 167.85 | **The prompt is typed**, the exact text in `src/assets/prompt.txt`. It starts at human speed ("Build a 3-minute film called ORIGIN…") and accelerates exponentially to thousands of characters per second. The editor scrolls, the keys depress, and every character gets a keyclick panned by its key's x. The HUD falls through days, hours, minutes and seconds, and reads **NOW** on the last keystroke. |
-| **168.000 (72.1)** | **Enter** (sanctioned flash). The screen becomes a terminal: `$ node tools/render.mjs` and a progress bar filling to 10,800 / 10,800 (168.3–171.6). The ritardando begins, and the leitmotif returns on a solo piano-like pluck. |
-| 171.6–172.7 | The terminal gives way to a player showing the film's live output: the laptop inside the laptop inside the laptop. This is real feedback, the rendered output texture re-rendered onto the screen, iterated, with frame 0 at the bottom of the recursion. |
-| 172.7 → 179.983 | Push into the screen, which turns head-on. The nested screens rush outward, and HUD and post effects fade to zero as the screen fills the frame. The drone rises back in. |
-| **179.983 (frame 10799)** | **Lands on frame 0.** The last frame is byte-identical to the first rendered frame, so the MP4 loops. |
+| 180.0 (78.1) | Macro on the blinking cursor. The camera pulls back 180 → 181.5 to reveal the editor, the laptop and the room. |
+| 181.0 → 187.85 | **The prompt is typed**, the exact text in `src/assets/prompt.txt`. It starts at human speed ("Build a 3-minute film called ORIGIN…") and accelerates exponentially to thousands of characters per second. The editor scrolls, the keys depress, and every character gets a keyclick panned by its key's x. The HUD falls through days, hours, minutes and seconds, and reads **NOW** on the last keystroke. |
+| **188.000 (82.1)** | **Enter** (sanctioned flash). The screen becomes a terminal: `$ node tools/render.mjs` and a progress bar filling to 12,000 / 12,000 (188.3–191.6). The ritardando begins, and the leitmotif returns on a solo piano-like pluck. |
+| 191.6–192.7 | The terminal gives way to a player showing the film's live output: the laptop inside the laptop inside the laptop. This is real feedback, the rendered output texture re-rendered onto the screen, iterated, with frame 0 at the bottom of the recursion. |
+| 192.7 → 199.983 | Push into the screen, which turns head-on. The nested screens rush outward, and HUD and post effects fade to zero as the screen fills the frame. The drone rises back in. |
+| **199.983 (frame 11999)** | **Lands on frame 0.** The last frame is byte-identical to the first rendered frame, so the MP4 loops. |
 
 ---
 
 ## Loop contract
-* Visual: `frames/f10799` equals `frames/f00000` exactly. `verify/loop.mjs` diffs the source frames and the
+* Visual: `frames/f11999` equals `frames/f00000` exactly. `verify/loop.mjs` diffs the source frames and the
   decoded MP4 frames.
-* Audio: the drone's partials and LFOs sit on multiples of 1/180 Hz, so they are exactly
-  periodic over the film. Everything that rings past 180 s is folded back onto the start, so
+* Audio: the drone's partials and LFOs are whole cycles per film, so they are exactly
+  periodic over the film. Everything that rings past 200 s is folded back onto the start, so
   the wrap is sample-continuous. `verify/loop.mjs` checks the jump at the wrap point
   against the local sample-to-sample distribution.

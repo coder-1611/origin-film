@@ -135,20 +135,23 @@ function tiktaalik(t, ov = {}) {
   const finOffs = ov.finOffs || [0, 0];
   const call = ov.call || 0;
   const r = new Rig();
-  const X = bodyX(G, t);
+  // S (optional): an explicit crutching state from a behaviour plan (src/march/beats.js) — body X,
+  // fin feet, chest lift, head pitch (deg), gape, throat pulse, tail push; absent → the cyclic gait
+  const S = ov.state;
+  const X = S ? S.X : bodyX(G, t);
   const ph = fract(t / G.T);
   // alternating fins push twice per cycle; in-phase crutching once
   const ph2 = finOffs[0] === finOffs[1] ? ph : fract(ph * 2);
-  const push = Math.sin(Math.PI * clamp(ph2 / 0.5)) * (ph2 < 0.5 ? 1 : 0);   // 0..1 during the push
-  const rec = ph2 >= 0.5 ? Math.sin(Math.PI * (ph2 - 0.5) / 0.5) : 0;
-  const lift = 0.05 * push;                                               // fins lift the chest
-  const hp = 0.10, chestY = 0.16 + lift;
+  const push = S ? S.push : Math.sin(Math.PI * clamp(ph2 / 0.5)) * (ph2 < 0.5 ? 1 : 0);   // 0..1 during the push
+  const rec = S ? 0 : (ph2 >= 0.5 ? Math.sin(Math.PI * (ph2 - 0.5) / 0.5) : 0);
+  const lift = S ? 0.07 * S.chest - 0.03 : 0.05 * push;                  // fins lift the chest; at rest it lies on the sand
+  const hp = S ? 0.095 - 0.01 * (1 - S.chest) : 0.10, chestY = 0.16 + lift;
   const pel = [0, hp, 0], sh = [0.72, chestY, 0];
-  const headPitch = (4 + 10 * push - 3 * rec + 16 * call) * Math.PI / 180;
+  const headPitch = (S ? S.headPitch : 4 + 10 * push - 3 * rec + 16 * call) * Math.PI / 180;
   const neck = add(sh, [0.12, 0.012 + lift * 0.2, 0]);
   const hd = [Math.cos(headPitch), Math.sin(headPitch), 0];
   const snout = add(neck, hd, 0.3);
-  const tailSway = Math.sin(TAU * (t / G.T) + 1.2);
+  const tailSway = S ? S.tail : Math.sin(TAU * (t / G.T) + 1.2);
   const tl = (u) => [-0.95 * u, hp - 0.02 * u + 0.04 * u * u * tailSway, 0.18 * u * u * tailSway];
   r.noCuts = true;
   // body: one smooth, continuous curve from the tail tip to the flat head (dense spline samples)
@@ -166,7 +169,8 @@ function tiktaalik(t, ov = {}) {
   const H = (u, h) => add(add(neck, hd, u * 0.34), hup, h);
   const sk = [[0.0, 0.004, 0.085], [0.3, 0.008, 0.07], [0.62, 0.004, 0.052], [0.88, -0.004, 0.036], [1.0, -0.008, 0.028]];
   for (let i = 0; i < sk.length - 1; i++) r.cone(H(sk[i][0], sk[i][1]), H(sk[i + 1][0], sk[i + 1][1]), sk[i][2], sk[i + 1][2], { k: 0.02 });
-  const hinge = H(0.04, -0.035), gape = -0.3 * call;
+  const hinge = H(0.04, -0.035), gape = -0.3 * (S ? S.gape : call);
+  if (S && S.throat > 0.01) r.cone(H(0.1, -0.075), H(0.32, -0.07), 0.035 + 0.02 * S.throat, 0.028 + 0.012 * S.throat, { k: 0.02 });   // buccal pump
   const Jw = (p) => rotAbout(hinge, p, gape);
   r.cone(Jw(H(0.04, -0.035)), Jw(H(0.55, -0.042)), 0.06, 0.036, { k: 0.018 });
   r.cone(Jw(H(0.55, -0.042)), Jw(H(0.97, -0.03)), 0.036, 0.02, { k: 0.012 });
@@ -182,7 +186,7 @@ function tiktaalik(t, ov = {}) {
       const u = 0.26 + i * (0.78 / 16), rr = tailR(Math.min(u, 1)), h = finH(u) * Math.abs(sg);
       M.push({ p: add(tl(Math.min(u, 1.04)), [0, Math.sign(sg) * (rr * 0.6 + h * 0.5), 0]), r: h * 0.5 + rr * 0.3 });
     }
-    for (let i = 0; i < M.length - 1; i++) r.cone(M[i].p, M[i + 1].p, M[i].r, M[i + 1].r, { kind: 1, thick: 0.0045, k: 0.006 });
+    for (let i = 0; i < M.length - 1; i++) r.cone(M[i].p, M[i + 1].p, M[i].r, M[i + 1].r, { kind: 1, thick: S ? 0.009 : 0.0045, k: 0.006 });
     const NR = 30;
     for (let i = 0; i < NR; i++) {
       const u = 0.27 + i * (0.76 / (NR - 1)), rr = tailR(Math.min(u, 1)), h = finH(u) * Math.abs(sg);
@@ -201,7 +205,7 @@ function tiktaalik(t, ov = {}) {
     const far = side < 0 ? 1 : 0;
     r.group = side > 0 ? 'LF' : 'RF';
     const hip = add(sh, [-0.02, -0.06, 0.08 * side]);
-    const f = footTrack(G, t, side > 0 ? finOffs[0] : finOffs[1], sh[0] + 0.1, 0.07);
+    const f = S ? S.fin(side > 0 ? 'LF' : 'RF') : footTrack(G, t, side > 0 ? finOffs[0] : finOffs[1], sh[0] + 0.1, 0.07);
     const foot = [f.x - X, 0.012 + f.y, 0.22 * side];
     feet.push({ id: side > 0 ? 'LF' : 'RF', x: f.x, psi: f.psi, stance: f.stance, z: foot[2] });
     const { knee } = ik2(hip, foot, 0.16, 0.14, [0.2, 1, 0.6 * side]);
@@ -209,14 +213,15 @@ function tiktaalik(t, ov = {}) {
     r.cone(knee, foot, 0.03, 0.02, { k: 0.02, far });
     const lift = f.stance ? 0 : f.y / 0.07;
     // eight digits fanned out from the wrist (forward, down to the mud, and back), webbed
+    // (a planted fin presses flat: in profile its digits fan forward along the ground, not up)
     const dg = (i) => {
-      const a = (-10 + i * 24) * Math.PI / 180, L = 0.09 * (0.72 + 0.28 * Math.sin(Math.PI * i / 7));
+      const a = (S ? -18 + i * 8 : -10 + i * 24) * Math.PI / 180, L = 0.09 * (0.72 + 0.28 * Math.sin(Math.PI * i / 7));
       return add(foot, [Math.cos(a) * L, -0.004 + Math.max(0, Math.sin(a)) * L * 0.55 + 0.012 * lift, (0.3 - 0.08 * i) * 0.04 * side]);
     };
     for (let i = 0; i < 8; i++) {
       const tip = dg(i);
-      r.cone(foot, tip, 0.0055, 0.0016, { k: 0.002, far });
-      if (i < 7) r.cone(foot, mixv(mixv(tip, dg(i + 1), 0.5), foot, 0.15), 0.013, 0.006, { kind: 1, thick: 0.0045, k: 0.004, far });   // web
+      r.cone(foot, tip, S ? 0.009 : 0.0055, S ? 0.0035 : 0.0016, { k: 0.002, far });
+      if (i < 7) r.cone(foot, mixv(mixv(tip, dg(i + 1), 0.5), foot, 0.15), S ? 0.016 : 0.013, S ? 0.008 : 0.006, S ? { k: 0.006, far } : { kind: 1, thick: 0.0045, k: 0.004, far });   // web
     }
   }
   // pelvic fins: small rayed paddles, half a cycle later
@@ -224,7 +229,7 @@ function tiktaalik(t, ov = {}) {
     const far = side < 0 ? 1 : 0;
     r.group = side > 0 ? 'LH' : 'RH';
     const base = add(pel, [0.02, -0.05, 0.06 * side]);
-    const sw = Math.sin(TAU * (t / G.T + 0.5));
+    const sw = S ? -0.6 * S.push + 0.2 * S.tail : Math.sin(TAU * (t / G.T + 0.5));
     for (let i = 0; i < 5; i++) {
       const tip = add(base, [-0.12 - 0.01 * i, -0.045 + 0.012 * i + 0.02 * sw, 0.06 * side]);
       r.cone(base, tip, 0.006, 0.0015, { k: 0.002, far });
@@ -240,12 +245,13 @@ function tiktaalik(t, ov = {}) {
 function quadruped(t, P) {
   const G = { T: P.T, duty: P.duty, v: P.v, surge: P.surge || 0 };
   const r = new Rig();
-  const X = bodyX(G, t);
-  const cyc = t / G.T;
+  // optional gait clock (src/march/gait.js): variable speed, stops, stride variability; absent → as before
+  const X = P.clock ? P.clock.X(t) : bodyX(G, t);
+  const cyc = P.clock ? P.clock.phase(t) : t / G.T;
   // body bob: dips at double support (twice per cycle for symmetric gaits)
   const bob = (P.bob || 0) * Math.cos(TAU * 2 * (cyc + (P.bobPh || 0)));
   const roll = (P.pitchOsc || 0) * Math.sin(TAU * cyc);
-  const pel = [0, P.hp + bob, 0];
+  const pel = [P.pelX || 0, P.hp + bob, 0];
   const sh = [P.shX, P.shH + bob * 0.6 + roll * P.shX, 0];
   // lateral undulation: standing wave (nodes at the girdles) → travelling with speed
   const und = (P.undulate || 0), trav = P.travel || 0;
@@ -300,8 +306,14 @@ function quadruped(t, P) {
     const far = side < 0 ? 1 : 0;
     const girdle = kindL === 'hind' ? pel : sh;
     const root = add(girdle, [L.rootX || 0, L.rootY || 0, (L.width || 0) * side + lat(kindL === 'hind' ? 0 : 1)]);
-    const f = footTrack(G, t, P.offs[id], girdle[0] + (L.rootX || 0), L.lift, L.neutral || 0);
-    const foot = [f.x - X, (L.footY || 0) + f.y, (L.width || 0) * side + (L.sprawl || 0) * side];
+    // the gait clock places feet from the girdles' STANDING positions (a posture change — sitting,
+    // settling back — must not drag planted feet)
+    const hipX = (kindL === 'hind' ? 0 : (P.shX0 ?? P.shX)) + (L.rootX || 0);
+    let f = P.clock ? P.clock.foot(t, P.offs[id], G.duty, hipX, L.lift, L.neutral || 0) : footTrack(G, t, P.offs[id], hipX, L.lift, L.neutral || 0);
+    let foot = [f.x - X, (L.footY || 0) + f.y, (L.width || 0) * side + (L.sprawl || 0) * side];
+    // a behaviour may take a limb off the ground (a sitting ape's hands): body-relative target
+    const lo = P.limbTarget && P.limbTarget(id, foot, f);
+    if (lo) { foot = lo; f = { ...f, stance: false, s: 0.5 }; }
     limbs.push({ id, L, side, far, root, foot, f });
   }
   for (const lb of limbs) { r.group = lb.id; buildLimb(r, lb, P, t); }
@@ -310,7 +322,8 @@ function quadruped(t, P) {
   P.head(r, { neckTop, neckDir, sh, pel, t, cyc, X, sp, bob, scale: P.scale, call });
   r.group = 'x';
   if (P.extras) P.extras(r, { sp, sh, pel, t, cyc, X, limbs, tailPt, scale: P.scale, P });
-  const feet = limbs.map(lb => ({ id: lb.id, x: lb.f.x, psi: lb.f.psi, stance: lb.f.stance, z: lb.foot[2] }));
+  const feet = limbs.map(lb => ({ id: lb.id, x: lb.f.x, y: lb.f.y, psi: lb.f.psi, stance: lb.f.stance, z: lb.foot[2] }));
+  if (P.furScale && P.furScale !== 1) for (const q of r.p) if (q.kind === 2) q.fur = P.furScale;
   return { rig: r, X, height: P.frameH, len: P.frameL, center: P.center, G, feet };
 }
 
@@ -421,9 +434,11 @@ function lizardHead(r, { neckTop, neckDir, cyc, call = 0 }) {
   const d = nrm(add(neckDir, [0, -0.25, 0]));
   const tip = add(neckTop, d, 0.05 * s);
   r.cone(neckTop, tip, 0.0125 * s, 0.0035 * s, { k: 0.004 * s });
-  r.cone(add(neckTop, [-0.004 * s, -0.006 * s, 0]), rotAbout(add(neckTop, [-0.004 * s, -0.006 * s, 0]), add(tip, [-0.006 * s, -0.004 * s, 0]), -0.55 * call), 0.009 * s, 0.002 * s, { k: 0.003 * s });
-  // jowl / dewlap
-  r.cone(add(neckTop, [-0.008 * s, -0.008 * s, 0]), add(neckTop, [0.012 * s, -0.016 * s, 0]), 0.004 * s, 0.002 * s, { kind: 6, thick: 0.0015 * s, k: 0.004 * s });
+  // lower jaw: closed, it lies along the upper (no notch); it drops only when the lizard gapes/hisses
+  const jb = add(neckTop, [-0.004 * s, -0.006 * s, 0]);
+  r.cone(jb, rotAbout(jb, add(tip, [-0.004 * s, -0.0022 * s, 0]), -0.55 * call), 0.009 * s, 0.0026 * s, { k: (0.002 + 0.005 * (1 - Math.min(1, call * 3))) * s });
+  // jowl
+  r.cone(add(neckTop, [-0.008 * s, -0.008 * s, 0]), add(neckTop, [0.012 * s, -0.013 * s, 0]), 0.005 * s, 0.003 * s, { k: 0.004 * s });
   const eye = add(add(neckTop, d, 0.022 * s), [0, 0.0065 * s, 0]);
   r.cone(add(add(neckTop, d, 0.012 * s), [0, -0.0035 * s, 0.02 * s]), add(tip, [-0.002 * s, -0.002 * s, 0.02 * s]), 0.0004 * s, 0.0003 * s, { kind: 5 });
   // tongue flick, every other cycle (a life cue in 1.4 s)
@@ -513,8 +528,9 @@ const DEFS = {
       r.cone(Pt(0.985, 0.0), Pt(1.03, -0.006), 0.021, 0.016, { k: 0.008 });                                  // rounded snout tip
       r.cone(Pt(0.26, 0.078), Pt(0.36, 0.08), 0.02, 0.016, { k: 0.01 });                                     // brow over the eye
       r.cone(Pt(0.72, 0.043), Pt(0.8, 0.04), 0.009, 0.006, { k: 0.008 });                                     // nasal ridge
-      // lower jaw: hinged at the back; closed, a thin gap runs along the jaw line and the teeth cross it
-      const gap = 0.008, hinge = Pt(0.05, -0.06), jaw = [];
+      // lower jaw: hinged at the back. Lips (Cullen et al. 2023): closed, the upper lip overlaps the
+      // lower jaw — a smooth jaw line, no visible teeth
+      const gap = 0.0, hinge = Pt(0.05, -0.06), jaw = [];
       for (const u of [0.05, 0.3, 0.6, 0.97]) {
         const [hc, rc] = ph(u), rj = mix(0.04, 0.015, (u - 0.05) / 0.92);
         const top = u < 0.2 ? hc - rc + 0.012 : hc - rc - gap;
@@ -524,18 +540,10 @@ const DEFS = {
       const J = (p) => rotAbout(hinge, p, open);
       for (let i = 0; i < jaw.length - 1; i++) r.cone(J(jaw[i].p), J(jaw[i + 1].p), jaw[i].r, jaw[i + 1].r, { k: 0.006 });
       r.cone(J(add(jaw[0].p, up, -0.012)), J(add(jaw[1].p, up, -0.02)), 0.034, 0.024, { k: 0.01 });          // throat
-      // teeth: a serrated edge along both jaws (curved, pointing back a little)
-      for (let i = 0; i < 12; i++) {
-        const u = 0.3 + i * 0.058, [hc, rc] = ph(u);
-        const base = Pt(u, hc - rc + 0.004), tip = add(add(base, up, -0.017 - 0.004 * ((i * 7) % 3)), d, -0.004);
-        r.cone(base, tip, 0.0048, 0.0006, { k: 0 });
-      }
-      for (let i = 0; i < 10; i++) {
-        const u = 0.34 + i * 0.062;
-        const f = (u - 0.05) / 0.92, rj = mix(0.04, 0.015, f);
-        const [hc, rc] = ph(u), top = hc - rc - gap;
-        const base = J(Pt(u, top - 0.003)), tip = J(add(add(Pt(u, top - 0.003), up, 0.013), d, -0.003));
-        r.cone(base, tip, 0.004, 0.0006, { k: 0 });
+      // the upper lip: a soft labial margin draped over the jaw line (a slight scalloped edge)
+      for (let i = 0; i < 5; i++) {
+        const u0 = 0.28 + i * 0.13, u1 = Math.min(0.98, u0 + 0.15), [h0, r0] = ph(u0), [h1, r1] = ph(u1);
+        r.cone(Pt(u0, h0 - r0 * 0.78), Pt(u1, h1 - r1 * 0.78), 0.011 - i * 0.0012, 0.009 - i * 0.0012, { k: 0.008 });
       }
     },
     extras(r, { sh, pel, cyc, sp }) {
@@ -622,9 +630,9 @@ const DEFS = {
       const c = add(neckTop, [0.05, 0.035 + 0.02 * call, 0]);
       r.cone(add(c, [-0.03, 0.01, 0]), add(c, [0.03, 0.005, 0]), 0.085, 0.078, { k: 0.02, kind: 2 });            // cranium
       r.cone(add(c, [0.07, 0.03, 0]), add(c, [0.095, 0.026, 0]), 0.03, 0.028, { k: 0.02 });                       // brow ridge
-      r.cone(add(c, [0.07, -0.015, 0]), add(c, [0.14, -0.05, 0]), 0.055, 0.042, { k: 0.03 });                     // prognathic muzzle
-      r.cone(add(c, [0.06, -0.07, 0]), rotAbout(add(c, [0.06, -0.07, 0]), add(c, [0.13 + 0.02 * call, -0.078, 0]), -0.25 * call), 0.03, 0.026, { k: 0.02 });  // lower lip / jaw
-      r.cone(add(c, [0.14, -0.04, 0]), add(c, [0.155 + 0.035 * call, -0.058 - 0.012 * call, 0]), 0.022, 0.02 + 0.006 * call, { k: 0.015 });                   // upper lip (pouts)
+      r.cone(add(c, [0.058, -0.022, 0]), add(c, [0.112, -0.048, 0]), 0.056, 0.047, { k: 0.03 });                    // prognathic (not snouted) face
+      r.cone(add(c, [0.055, -0.07, 0]), rotAbout(add(c, [0.055, -0.07, 0]), add(c, [0.112 + 0.02 * call, -0.08, 0]), -0.25 * call), 0.03, 0.026, { k: 0.02 });  // lower lip / jaw
+      r.cone(add(c, [0.12, -0.045, 0]), add(c, [0.134 + 0.035 * call, -0.06 - 0.012 * call, 0]), 0.021, 0.019 + 0.006 * call, { k: 0.015 });                  // upper lip (funnels out)
       for (const [dz, far] of [[0.075, 0], [-0.075, 1]]) {                                                        // big round ears
         const e = add(c, [-0.01, 0.0, dz]);
         r.cone(e, add(e, [-0.02, 0.025, 0.01 * Math.sign(dz)]), 0.036, 0.03, { kind: 6, thick: 0.0045, k: 0.004, far });
@@ -663,10 +671,19 @@ const DEFS = {
       // (shoulder and elbow angles interpolate, so the arm keeps its length). Far (right) arm swings
       // opposite its leg, relaxing to hang when the walker stops (P.armRelax).
       const S = add(sh, [0.0, -0.035, 0.17]), Sf = add(sh, [0.0, -0.035, -0.17]);
-      const rz = P.raise || 0, re = rz * rz * (3 - 2 * rz);
+      // raised pose: fixed angles, or (P.torchTarget: the flame anchor, body-relative) the exact two-bone
+      // solution that puts the flame there — P.raise (already eased, may overshoot 1) blends to it
+      let A1 = 10, A2 = 40, AT = 70, re;
+      if (P.torchTarget) {
+        AT = P.torchAt ?? 74; re = P.raise || 0;
+        const td0 = [Math.cos(AT * Math.PI / 180), Math.sin(AT * Math.PI / 180)];
+        const hT = [P.torchTarget[0] - td0[0] * 0.47, P.torchTarget[1] - td0[1] * 0.47 - 0.03, 0];
+        const { knee: e2 } = ik2([S[0], S[1], 0], hT, 0.28, 0.26, [1, -0.35, 0]);
+        A1 = Math.atan2(e2[1] - S[1], e2[0] - S[0]) * 180 / Math.PI; A2 = Math.atan2(hT[1] - e2[1], hT[0] - e2[0]) * 180 / Math.PI;
+      } else { const rz = P.raise || 0; re = rz * rz * (3 - 2 * rz); }
       r.group = 'LF';
-      const lift = 0.01 * Math.sin(TAU * 2 * cyc) * (1 - re);
-      const a1 = (-80 + 90 * re) * Math.PI / 180, a2 = (-15 + 55 * re) * Math.PI / 180, at = (35 + 35 * re) * Math.PI / 180;
+      const lift = 0.01 * Math.sin(TAU * 2 * cyc) * (1 - Math.min(1, re));
+      const a1 = mix(-80, A1, re) * Math.PI / 180, a2 = mix(-15, A2, re) * Math.PI / 180, at = mix(35, AT, re) * Math.PI / 180;
       const el = add(S, [0.28 * Math.cos(a1), 0.28 * Math.sin(a1) + lift, 0.03]);
       const hand = add(el, [0.26 * Math.cos(a2), 0.26 * Math.sin(a2), 0.0]);
       r.cone(S, el, 0.047, 0.036, { k: 0.02 });
@@ -696,6 +713,9 @@ const DEFS = {
     frameH: 2.05, frameL: 1.7, center: [0.12, 1.0],
   },
 };
+
+/** The builder parameters of a stage (read-only: e.g. to wrap its head builder). */
+export function builderDefs(key) { return DEFS[key]; }
 
 /** Pose any stage at time t (seconds, local to the stage). Returns { prims, meta }. */
 export function poseCreature(key, t, ov = {}) {

@@ -5,6 +5,8 @@
 // Every sound is synthesised: oscillators, noise, filters, envelopes, FM, Karplus-Strong
 // buffers and a procedurally generated convolution impulse response. No samples.
 import * as T from '../timeline.js';
+import * as V from './nature/voices.js';
+import { outdoor, normalize } from './nature/dsp.js';
 
 const SR_DEFAULT = T.SAMPLE_RATE;
 export const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
@@ -218,6 +220,7 @@ export class ScoreEngine {
     this.drums = g(0.9); this.drums.connect(this.master);
     this.sfxBus = g(0.9); this.sfxBus.connect(this.master);
     this.droneBus = g(0.32); this.droneBus.connect(this.master);
+    this.natureBus = g(1); this.natureBus.connect(this.master);     // VI's shore: animals + ambience (not ducked, not lowpassed)
 
     // Reverb (procedural IR) and a dotted-eighth delay for the lead.
     if (!this.buffers.ir) {
@@ -251,7 +254,21 @@ export class ScoreEngine {
     for (let i = 0; i < n; i++) v[i] = f(t0 + (t1 - t0) * i / (n - 1));
     param.setValueCurveAtTime(v, this.at(t0), t1 - t0);
   }
+  /** Extra music duck (−5 dB, slow) under the animal calls, so the voices sit in front of the strings. */
+  callDuckAt(t) {
+    if (!this._calls) this._calls = T.sfx.filter(e => e.type === 'nature' && e.duck);
+    let d = 0;
+    for (const e of this._calls) {
+      if (t < e.t - 0.4 || t > e.t + e.dur + 1.5) continue;
+      const a = Math.min(1, (t - (e.t - 0.4)) / 0.4), r = Math.min(1, Math.max(0, (e.t + e.dur + 1.5 - t) / 1.5));
+      d = Math.max(d, Math.min(a, r));
+    }
+    return Math.pow(10, -5 * d / 20);
+  }
   duckAt(t) {
+    return this.kickDuckAt(t) * this.callDuckAt(t);
+  }
+  kickDuckAt(t) {
     const depth = 1 - Math.pow(10, -T.automation.duckDb / 20), rel = T.automation.duckRelease / 3;
     let e = 0;
     // kicks are sorted; look back 0.6 s
@@ -369,6 +386,8 @@ export class ScoreEngine {
     this.route(g, bus, { wet, delay, pan: 0 });
   }
   i_pad(n, w) { this.supersaw(n, w, { voices: 6, spread: 16, cutoff: 2600, env: 2200, a: 0.45, d: 1.2, s: 0.85, r: 1.1, peak: 0.055, wet: 0.55 }); }
+  // Slow string ensemble for the march: narrow detune, dark filter, long bow-like attack and release.
+  i_strings(n, w) { this.supersaw(n, w, { voices: 5, spread: 8, cutoff: 1100, env: 700, a: 1.8, d: 2.5, s: 0.9, r: 2.8, peak: 0.07, q: 0.5, wet: 0.85 }); }
   i_choir(n, w) { this.supersaw(n, w, { voices: 6, spread: 22, cutoff: 3400, env: 1400, a: 0.35, d: 1.5, s: 0.9, r: 1.4, peak: 0.075, wet: 0.7, formant: true }); }
   i_lead(n, w) { this.supersaw(n, w, { voices: 7, spread: 20, cutoff: 2600, env: 5200, a: 0.012, d: 0.35, s: 0.75, r: 0.28, peak: 0.13, q: 1.2, wet: 0.35, delay: 0.3 }); }
   i_sub(n, w) {
@@ -579,6 +598,42 @@ export class ScoreEngine {
     nz.connect(bp); bp.connect(ng); ng.connect(g);
     this.route(g, this.sfxBus, { pan: e.x * 0.85, wet: 0.6 });
   }
+  // ---- VI: the shore's nature layer (research: docs/research/animal-realism.md) ----------
+  // Every animal sound and the ambience are pure-JS syntheses (src/audio/nature/voices.js),
+  // placed outdoors by distance and screen position, normalised to a per-voice reference peak,
+  // precomputed once into a buffer and scheduled at the event's time (from timeline → march plan).
+  natureBuffer(e) {
+    const key = 'nat:' + e.voice + ':' + JSON.stringify(e.params || {}) + ':' + (e.dist ?? '') + ':' + e.x.toFixed(3) + ':' + (e.dur ?? '');
+    if (!this.buffers[key]) {
+      const sr = this.sr, p = e.params || {};
+      const make = {
+        footstep: () => V.footstep(sr, p), haulout: () => V.tetrapodHaulOut(sr, p), boom: () => V.theropodBoom(sr, p),
+        hiss: () => V.lizardHiss(sr, p), bark: () => V.foxBarks(sr, p), panthoot: () => V.pantHoot(sr, p), torch: () => V.torch(sr, p),
+        frog: () => V.frogCall(sr, p), surf: () => V.surf(sr, e.dur, p), wind: () => V.wind(sr, e.dur, p), flock: () => V.flock(sr, e.dur, p),
+      }[e.voice];
+      if (!make) throw new Error('unknown nature voice ' + e.voice);
+      let x = make();
+      if (x instanceof Float32Array) x = outdoor(sr, x, { distance: e.dist ?? 12, hs: e.hs ?? 1, pan: Math.max(-1, Math.min(1, (e.x || 0) * 0.85)), seed: 7 + (key.length % 97) });
+      normalize(x, e.peakDb ?? -6);
+      const b = this.ctx.createBuffer(2, x.L.length, sr); b.copyToChannel(x.L, 0); b.copyToChannel(x.R, 1);
+      this.buffers[key] = b;
+    }
+    return this.buffers[key];
+  }
+  s_nature(e, w, offset = 0) {
+    const buf = this.natureBuffer(e);
+    const s = this.src(buf, w, { offset });
+    const g = this.ctx.createGain();
+    const v = e.vel ?? 1;
+    if (e.fadeIn || e.fadeOut) {
+      const a = e.fadeIn || 0.01, r = e.fadeOut || 0.01, end = w - offset + e.dur;
+      g.gain.setValueAtTime(offset > 0 ? v : 0, Math.max(w, 0));
+      if (offset < a) g.gain.linearRampToValueAtTime(v, w + (a - offset));
+      g.gain.setValueAtTime(v, Math.max(w, end - r));
+      g.gain.linearRampToValueAtTime(0, end);
+    } else g.gain.value = v;
+    s.connect(g); g.connect(this.natureBus);
+  }
   // ---- VI: the march (footsteps, calls, the torch) ----------------------------------------
   s_step(e, w) {
     const c = this.ctx, g = c.createGain(), k = e.kind;
@@ -712,7 +767,7 @@ export class ScoreEngine {
     const SUSTAIN = new Set(['pad', 'choir', 'sub', 'lead', 'sine', 'piano']);
     for (const n of T.notes) if (SUSTAIN.has(n.inst) && n.t < t0 && n.t + n.dur > t0 + 0.05) this.play({ ...n, t: t0, dur: n.t + n.dur - t0 });
     for (const e of T.sfx) {
-      if ((e.type === 'keys' || e.type === 'crackle') && e.t < t0 && e.t + e.dur > t0) this['s_' + e.type](e, this.at(t0), t0 - e.t);
+      if ((e.type === 'keys' || e.type === 'crackle' || (e.type === 'nature' && e.dur > 2)) && e.t < t0 && e.t + e.dur > t0) this['s_' + e.type](e, this.at(t0), t0 - e.t);
     }
     this.scheduledTo = t0;
   }
@@ -741,12 +796,21 @@ export class ScoreEngine {
 }
 
 /** Render the whole score offline. Returns an AudioBuffer (186 s, stereo, 48 kHz, pre-master). */
-export async function renderOffline(onProgress) {
-  const sr = T.SAMPLE_RATE, len = Math.ceil((T.DURATION + T.AUDIO_TAIL) * sr);
+export async function renderOffline(onProgress, { from = null, to = null } = {}) {
+  const sr = T.SAMPLE_RATE;
+  const range = from !== null;                        // audition a window (fast iteration), not the film
+  const len = Math.ceil((range ? to - from : T.DURATION + T.AUDIO_TAIL) * sr);
   const ctx = new OfflineAudioContext({ numberOfChannels: 2, length: len, sampleRate: sr });
   const eng = new ScoreEngine(ctx, { live: false }).build();
   const t0 = performance.now();
-  eng.scheduleAll();
+  if (range) {
+    eng.origin = -from;
+    eng.automate(from, to);
+    eng.startDrone(from);
+    for (const n of T.notes) if (n.t < from && n.t + n.dur > from + 0.05 && ['pad', 'choir', 'sub', 'lead', 'sine', 'piano', 'strings'].includes(n.inst)) eng.play({ ...n, t: from, dur: n.t + n.dur - from });
+    for (const e of T.sfx) if (e.type === 'nature' && e.dur > 2 && e.t < from && e.t + e.dur > from) eng.s_nature(e, 0, from - e.t);
+    eng.scheduleRange(from, to);
+  } else eng.scheduleAll();
   onProgress && onProgress(`scheduled in ${(performance.now() - t0).toFixed(0)} ms`);
   const buf = await ctx.startRendering();
   onProgress && onProgress(`rendered in ${(performance.now() - t0).toFixed(0)} ms`);

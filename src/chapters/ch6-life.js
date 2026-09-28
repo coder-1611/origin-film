@@ -1,9 +1,10 @@
 // VI · LIFE (106–154 s, bars 41–64). One continuous shot:
 //   Gray-Scott reaction-diffusion (cells on a stromatolite) → a space-colonization forest sprouting
 //   on the shore (over-under at the waterline) → boids (fish school → breach → birds → a murmuration)
-//   → the march: a silhouette walker evolving tetrapod → human on wet sand before the setting sun,
-//   feet planting on every footstep; the human raises a torch whose flame takes the sun's last
-//   glint at the exact centre and becomes the ember of chapter VII.
+//   → the shore at sunset: seven separate animals at real size, each on its own clock (a tetrapod
+//   hauling out … an early human), met one by one by a drifting documentary camera; the human raises
+//   a torch whose flame takes the sun's last glint at the exact centre and becomes the ember of VII.
+//   The shore's timing is src/march/ (marchPlan(): every footfall, breath and call, for the audio).
 // Every stateful sim replays deterministically from the window start (see ch6/rd.js, ch6/boids.js);
 // everything else is a pure function of t.
 import { THREE } from '../engine/gl.js';
@@ -17,7 +18,9 @@ import { makeAirView } from './ch6/air.js';
 import { makeGrove } from './ch6/grove.js';
 import { makeMarch } from './ch6/march.js';
 import { MARCH_FRAME } from './ch6/camera.js';
-import { makeCreatureRenderer } from './ch6/lab/creature-render.js';
+import { makeWalkRenderer } from './ch6/walk-render.js';
+import { makeWaterDance } from './ch6/lab/water-dance.js';
+import { marchPlan } from '../march/plan.js';
 import { makeBoids, TB0 } from './ch6/boids.js';
 import { makeCreatures } from './ch6/creatures.js';
 import { makeShadowUniforms, makeSunShadow } from './ch6/shadow.js';
@@ -25,7 +28,7 @@ import * as L from './ch6/layout.js';
 import { makeFlockGoal } from './ch6/flock.js';
 
 const { DEG } = L;
-let marchSwitchT = 122, shadow, boids, cre, grove, march, walkR, walkFrame, mOut, G, noise, caus, rd, water, air, comp, camAir, camWater, camBase, T, wOut, aOut;
+let marchSwitchT = 122, shadow, boids, cre, grove, march, walkR, dance, walkFrame, mOut, G, noise, caus, rd, water, air, comp, camAir, camWater, camBase, T, wOut, aOut;
 const SS = 2;                  // supersampling of the internal views (downsampled in the composite)
 const RD_PORT = 0.12;          // dome-port radius (m): where the waterline crosses the lens
 
@@ -232,14 +235,15 @@ function makeComposite(ctx) {
   };
 }
 
-// ---------------------------------------------------------------- the march
-// The silhouette walker, the wet sand and the sea below the horizon (lab renderer, walk-local
-// frame), over this chapter's own air view above it (sky, murmuration, far land): one image.
-const SHORE = [-5.0, -1.4, 8.0, -2.4];          // sea where z < mix(8, −2.4, smoothstep(−5, −1.4, x))
+// ---------------------------------------------------------------- the shore
+// The animals (each on its own depth plane), the wet sand and the sea below the horizon (walk-local
+// frame), over this chapter's own air view above it (sky, murmuration, far land): one image. The
+// water dance at the booming theropod's feet is added on top (world coordinates, HDR, additive).
+const toWorldXZ = ([x, z]) => { const F = MARCH_FRAME; return [F.O[0] + F.X[0] * x + F.Z[0] * z, F.O[2] + F.X[2] * x + F.Z[2] * z]; };
 function renderMarch(ctx, t) {
   const w = march.at(t);
   let flame = null, gain = 0;
-  const u = t - T.march.torch;
+  const u = t - TK.torch;
   if (w.flame && u > -0.02) {
     // the catch: the glint's light passes straight into a flame that flares, then settles
     const grow = T.smootherstep(-0.015, 0.05, u);
@@ -248,9 +252,10 @@ function renderMarch(ctx, t) {
     flame = [w.flame[0], w.flame[1], size];
   }
   walkR.render(ctx.renderer, mOut, camAir, {
-    A: w.A, t, H: ctx.H, flame, flameGain: gain, frame: walkFrame, bg: aOut.texture, hybrid: true,
-    shore: SHORE, clip: [march.clipX0, 0.12, 0.25], ripples: march.ripples(t), scroll: 0,
+    list: w.list, H: ctx.H, flame, flameZ: w.flameZ, flameGain: gain, frame: walkFrame, bg: aOut.texture,
+    shore: march.shore(t), ripples: march.ripples(t), dof: march.dof(t),
   });
+  if (w.dance && w.dance.amp > 0.001) dance.render(ctx.renderer, mOut, camAir, { t, amp: w.dance.amp, f0: w.dance.f0, feet: w.dance.feet.map(toWorldXZ), H: ctx.H, radius: 1.3, scale: 1 });
 }
 
 export default {
@@ -258,7 +263,8 @@ export default {
 
   async init(ctx) {
     T = ctx.T;
-    TK = { breach: T.BREACH_T, march: T.march.t0, stand: T.march.standAt, torch: T.march.torch, end: T.chapterById.VI.end,
+    const MP = marchPlan();
+    TK = { breach: T.BREACH_T, march: MP.t0, stand: MP.standAt, torch: MP.torch, end: T.chapterById.VI.end,
       forestEnd: T.leafFlushes[T.leafFlushes.length - 1].t + 0.25 };
     PAL.t = [114, 120, TK.breach - 1, TK.march + 1, TK.march + 7, TK.stand - 5, TK.torch + 0.2, TK.end + 0.4];
     G = { ...makeGlobals(), ...makeShadowUniforms() };
@@ -285,8 +291,9 @@ export default {
     shadow = makeSunShadow(G);
     grove = makeGrove(ctx, G, T);
     grove.addTo(air.scene, shadow.scene);
-    march = makeMarch(T);
-    walkR = makeCreatureRenderer({ mode: 'sil', skyGLSL: GL_UNIFORMS + GL_SKY, uniforms: G });
+    march = makeMarch({ end: T.chapterWindow('VI')[1] });
+    walkR = makeWalkRenderer({ skyGLSL: GL_UNIFORMS + GL_SKY, uniforms: G });
+    dance = makeWaterDance(ctx, G);
     const X = MARCH_FRAME.X, Z = MARCH_FRAME.Z;
     walkFrame = { rot: new THREE.Matrix3().set(X[0], 0, Z[0], X[1], 1, Z[1], X[2], 0, Z[2]), origin: new THREE.Vector3(...MARCH_FRAME.O) };
     mOut = ctx.makeTarget(ctx.W, ctx.H);

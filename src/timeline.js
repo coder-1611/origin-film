@@ -9,6 +9,7 @@
 // in Node. All randomness comes from seeded mulberry32 streams.
 // ----------------------------------------------------------------------------------------
 import { PROMPT } from './assets/prompt.js';
+import { marchPlan } from './march/plan.js';
 
 export const FPS = 60;
 export const DURATION = 200;                  // 3:20 (VI's evolution got 20 s more)
@@ -439,52 +440,49 @@ S(bt(50, 3), BREACH_T - bt(50, 3), 'whoosh', 0.6, 0, { x1: 0 });
 S(BREACH_T, 1.2, 'splash', 0.55, 0, { small: true });
 S(bt(64), barLen(64), 'riser', 0.7, 0);
 
-// ----- The march: evolution on the shore at sunset (128–150 s) ----------------------------
-// One procession walks left → right toward the sun at screen centre. Each stage is the lead
-// walker from its t0 to the next stage's t0; marchX(t) is the lead walker's screen x (NDC),
-// and every footstep below is a foot planting at that moment (the walk cycle must plant on it).
-// The human stops at centre at march.standAt and raises a torch that catches at march.torch;
-// its flame is the ember that VII's fire grows from.
-export const footsteps = [];     // { t, stage, x, foot (0/1), weight }
+// ----- The march: evolution on the shore at sunset (128–154 s) ----------------------------
+// Seven animals at real size, each on its own gait clock and bout plan (src/march/*), met in turn
+// by a camera drifting along the beach; nothing morphs and nothing is on the beat grid. The plan is
+// shared: the chapter's visuals plant every foot and time every gesture on these exact events, and
+// the audio schedules its synthesised voices from them (research: docs/research/animal-realism.md).
 export const march = (() => {
-  const stages = [
-    { name: 'tetrapod',  t0: bt(52),    every: 1,    weight: 0.35, kind: 'slap' },
-    { name: 'amphibian', t0: bt(53, 3), every: 0.5,  weight: 0.25, kind: 'pad',     call: { type: 'croak', beat: 1 } },
-    { name: 'reptile',   t0: bt(55),    every: 0.25, weight: 0.16, kind: 'patter',  call: { type: 'hiss',  beat: 1.5 } },
-    { name: 'dinosaur',  t0: bt(57),    every: 1,    weight: 1.0,  kind: 'stomp',   call: { type: 'roar',  beat: 0 } },
-    { name: 'mammal',    t0: bt(59),    every: 0.5,  weight: 0.3,  kind: 'pad',     call: { type: 'chirp', beat: 1 } },
-    { name: 'ape',       t0: bt(60, 3), every: 0.5,  weight: 0.45, kind: 'knuckle', call: { type: 'hoot',  beat: 1 } },
-    { name: 'human',     t0: bt(62),    every: 1,    weight: 0.5,  kind: 'foot' },
-  ];
-  const standAt = bt(63), torch = bt(63, 3);
-  stages.forEach((s, i) => { s.t1 = i < stages.length - 1 ? stages[i + 1].t0 : standAt; });
-  return { t0: stages[0].t0, t1: bt(65), stages, standAt, torch,
-    path: [[stages[0].t0, -0.85], [standAt, 0.0], [bt(65), 0.0]] };
+  const P = marchPlan();
+  return { t0: P.t0, t1: P.t1, torch: P.torch, standAt: P.standAt, animals: P.animals, events: P.events };
 })();
-export function marchX(t) { return pwl(march.path, t); }
-export function marchStage(t) { let k = 0; march.stages.forEach((s, i) => { if (t >= s.t0) k = i; }); return k; }
 {
-  const RM = mulberry32(0x3A6C);                                     // own stream: nothing else shifts
-  S(march.t0, 0.9, 'splash', 0.3, marchX(march.t0), { small: true }); // the tetrapod hauls out of the water
-  march.stages.forEach((st, si) => {
-    let foot = 0;
-    for (let b = beatAt(st.t0); ; b += st.every) {
-      const t = timeAtBeat(b);
-      if (t >= st.t1 - 1e-6) break;
-      const x = marchX(t);
-      footsteps.push({ t, stage: si, x, foot, weight: st.weight });
-      S(t, 0.25, 'step', st.weight * (0.85 + 0.3 * RM()), x, { kind: st.kind });
-      foot ^= 1;
+  const P = march;
+  const h = (str) => { let x = 2166136261; for (let i = 0; i < str.length; i++) x = Math.imul(x ^ str.charCodeAt(i), 16777619); return (x >>> 0) % 100000; };
+  const pan = (x) => Math.max(-1, Math.min(1, x));                      // off-screen (|x| > 1) pans hard
+  const level = (ref, d, refD) => ref - 20 * Math.log10(Math.max(1, d) / refD);   // 1/r
+  for (const e of P.events) {
+    const x = pan(e.x);
+    if (e.type === 'step') {
+      const ref = e.m >= 1000 ? -10 : e.m >= 40 ? -22 : e.m >= 5 ? -28 : -34;      // peak at 8 m, by mass
+      S(e.t, 1.2, 'nature', 1, x, { voice: 'footstep', params: { m: e.m, kind: e.kind, ground: e.ground, seed: h(e.animal + e.foot + e.t.toFixed(3)) },
+        dist: e.dist, hs: e.m >= 1000 ? 0 : 0.2, peakDb: level(ref, e.dist, 8) });
+    } else if (e.type === 'haulout') {
+      S(e.t, 3.6, 'nature', 1, x, { voice: 'haulout', params: { lunges: e.lunges, gulpAt: e.gulpAt, seed: e.seed }, dist: e.dist, hs: 0.2, peakDb: level(-17, e.dist, 5) });
+    } else if (e.type === 'boom' && e.i === 0) {
+      // one render of the whole bout (gulps, inhale, SAV, booms), started at the bout's origin
+      S(e.bout.start, e.bout.end + 0.8, 'nature', 1, x, { voice: 'boom', params: { plan: e.bout, seed: 57 }, dist: e.dist, hs: 1.8, peakDb: level(-6, e.dist, 15), duck: true });
+    } else if (e.type === 'hiss') {
+      S(e.t, e.dur, 'nature', 1, x, { voice: 'hiss', params: { seed: e.seed, count: e.count }, dist: e.dist, hs: 0.3, peakDb: level(-24, e.dist, 4), duck: true });
+    } else if (e.type === 'bark') {
+      S(e.t, 2.6, 'nature', 1, x, { voice: 'bark', params: { seed: e.seed, count: e.count }, dist: e.dist, hs: 0.4, peakDb: level(-17, e.dist, 12) });
+    } else if (e.type === 'panthoot') {
+      S(e.t, e.climaxAt - e.t + 3.2, 'nature', 1, x, { voice: 'panthoot', params: { seed: e.seed }, dist: e.dist, hs: 1, peakDb: level(-13, e.dist, 10), duck: true });
     }
-    if (st.call) {
-      const t = timeAtBeat(beatAt(st.t0) + st.call.beat);
-      S(t, st.call.type === 'roar' ? 1.6 : 0.6, 'call', st.call.type === 'roar' ? 0.9 : 0.55, marchX(t), { call: st.call.type });
-    }
-  });
-  // The dinosaur roars twice: on its downbeat and again as it turns toward the sun.
-  S(bt(58), 1.4, 'call', 0.75, marchX(bt(58)), { call: 'roar' });
-  S(march.torch, 1.4, 'ignite', 0.8, 0);
+  }
+  // the torch catches: a whoomph, then a crackle settling to a slow burn (VII's fire takes over)
+  S(P.torch - 0.3, 4.0, 'nature', 1, 0, { voice: 'torch', params: { seed: 4, dur: 4, igniteAt: 0.3 }, dist: 3, hs: 1.8, peakDb: -13 });
 }
+// ----- The shore's ambience (VI) --------------------------------------------------------
+// Surf as individual waves from the moment the camera surfaces, wind under the march, a distant
+// flock while the birds are overhead. Synthesised in src/audio/nature/voices.js; the long beds
+// fade out as night falls into VII's fire.
+S(113.7, 154.6 - 113.7, 'nature', 1, 0, { voice: 'surf', params: { seed: 11, period: 8.5 }, peakDb: -15, fadeIn: 1.2, fadeOut: 3.2 });
+S(124.0, 154.4 - 124.0, 'nature', 1, 0, { voice: 'wind', params: { seed: 21 }, peakDb: -27, fadeIn: 3, fadeOut: 2.5 });
+S(126.4, 151.6 - 126.4, 'nature', 1, 0.2, { voice: 'flock', params: { seed: 31, distance: 140 }, peakDb: -25, fadeIn: 2.5, fadeOut: 2.5 });
 
 // ===== VII · FIRE TO FIBER (bars 65-77, 120 BPM) ===========================================
 // The frieze: line drawings laid out along one long scroll; the camera trucks right.
@@ -685,6 +683,22 @@ N(196.0, 6.5, 'piano', 62, 0.62);                                    // …→ D
 N(196.0, 6.5, 'piano', 50, 0.35);
 N(196.0, 5.5, 'pad', 50, 0.22); N(196.0, 5.5, 'pad', 57, 0.2); N(196.0, 5.5, 'pad', 62, 0.18);
 
+// ----- The march is scored as nature, not as a groove -------------------------------------
+// From the first animal (128 s) to the torch (151 s) the drums, claps, marimba and pads fall
+// away, and the harmony becomes a slow string bed under the surf, the wind and the animals.
+// (They're generated above and removed here, so the shared random streams — and therefore every
+// later event — stay exactly as they were.)
+{
+  const a = march.t0 - 0.02, b = march.torch;
+  const drop = new Set(['kick', 'snare', 'clap', 'hat', 'ohat', 'marimba', 'pad', 'sub']);
+  for (let i = notes.length - 1; i >= 0; i--) { const n = notes[i]; if (n.t >= a && n.t < b && drop.has(n.inst)) notes.splice(i, 1); }
+  for (let bar = 52; bar <= 62; bar++) {
+    const t = bt(bar), dur = bt(bar + 1) - t + 1.4;
+    const ch = CHORDS[chart[bar]];
+    for (const m of voicing(ch, 50, 74, 4)) N(t, dur, 'strings', m, 0.4);
+    if (bar % 2 === 0) N(t, bt(bar + 2) - t, 'sub', bassNote(ch, 36), 0.22);
+  }
+}
 notes.sort((a, b) => a.t - b.t || a.midi - b.midi);
 sfx.sort((a, b) => a.t - b.t);
 
@@ -757,8 +771,8 @@ export const hud = {
   anchors: [
     [0, 13.8e9], [12, 13.8e9], [bt(5), 13.79962e9], [32, 13.6e9], [bt(12), 12.0e9], [58, 4.6e9],
     [THEIA_T, 4.51e9], [bt(29), 4.4e9], [SPLASH_T, 3.9e9], [106, 3.8e9], [bt(45), 4.7e8],
-    [BREACH_T, 3.8e8], [march.stages[0].t0, 3.75e8], [march.stages[1].t0, 3.4e8], [march.stages[2].t0, 3.1e8],
-    [march.stages[3].t0, 2.3e8], [march.stages[4].t0, 6.6e7], [march.stages[5].t0, 2.0e7], [march.stages[6].t0, 2.0e6],
+    [BREACH_T, 3.8e8], [march.animals[0].t0, 3.75e8], [march.animals[1].t0, 3.4e8], [march.animals[2].t0, 3.1e8],
+    [march.animals[3].t0, 2.3e8], [march.animals[4].t0, 6.6e7], [march.animals[5].t0, 2.0e7], [march.animals[6].t0, 2.0e6],
     [march.torch, 1.05e6], [bt(65), 1.0e6], [bt(67), 5500],
     [bt(69), 586], [bt(71), 250], [bt(73), 55], [bt(76, 3), 1], [typing.start, 1 / 365.25],
     [typing.times[typing.humanChars], 1 / 8766], [typing.last, 1 / 31557600],
@@ -927,10 +941,10 @@ export const cameras = {
           { t: 96.0, pos: [1.19217, -0.33449, 2.95073], target: [0, 0, 0], fov: 40, roll: 32 } ],
   // VI: metres, sea surface y = 0. Macro on the stromatolite's live colony → crane back and up,
   // rising through the surface ~113.8–114.3 → over-under at the waterline (the forest sprouts, the
-  // school gathers, the breach at BREACH_T) → tilt up with the flock and swing to the sun → the march:
-  // level at the sun on the horizon (screen centre), trucking so the lead walker's screen x follows
-  // marchX, craning with the raised torch so its flame lands on the horizon at the centre at
-  // march.torch → night: dolly straight back along the axis. GENERATED by `node src/chapters/ch6/camera.js`.
+  // school gathers, the breach at BREACH_T) → tilt up with the flock and swing to the sun → the shore:
+  // a documentary drift along the beach meeting seven animals in turn (src/march/camera.js; lower and
+  // closer for small ones), settling so the torch flame is at the exact centre on the horizon at the
+  // catch (151.0) → night: dolly straight back along the axis. GENERATED by `node src/chapters/ch6/camera.js`.
   VI:   [ { t: 105, pos: [0, -0.57581, -1.34994], target: [0, -1.19955, -4.28438], fov: 50, roll: 0 },
           { t: 108, pos: [0, -0.57831, -1.36168], target: [0, -1.20204, -4.29612], fov: 50, roll: 0 },
           { t: 110, pos: [0, -0.57997, -1.3695], target: [0, -1.2037, -4.30395], fov: 50, roll: 0 },
@@ -949,117 +963,117 @@ export const cameras = {
           { t: 126.4, pos: [0.03, 0.13, 0.58], target: [0.23116, 0.95691, -2.29676], fov: 50, roll: 0 },
           { t: 126.72, pos: [0.12, 0.36, 0.7], target: [0.99025, 1.72197, -1.82739], fov: 44, roll: 0 },
           { t: 127.02, pos: [0.2, 0.57, 0.82], target: [2.00547, 1.44712, -1.40957], fov: 35, roll: 0 },
-          { t: 127.36, pos: [-0.13059, 0.7, 0.44643], target: [2.16754, 0.7, -1.48193], fov: 24, roll: 0 },
-          { t: 127.75, pos: [0.14172, 0.7, 0.77096], target: [2.43985, 0.7, -1.15741], fov: 24, roll: 0 },
-          { t: 128, pos: [0.25, 0.7, 0.9], target: [2.54813, 0.7, -1.02836], fov: 24, roll: 0 },
-          { t: 128.25, pos: [0.33013, 0.70001, 0.99549], target: [2.62826, 0.70001, -0.93287], fov: 24, roll: 0 },
-          { t: 128.5, pos: [0.47234, 0.70007, 1.16498], target: [2.77047, 0.70007, -0.76339], fov: 24, roll: 0 },
-          { t: 128.75, pos: [0.61456, 0.70022, 1.33446], target: [2.91269, 0.70022, -0.5939], fov: 24, roll: 0 },
-          { t: 129, pos: [0.69468, 0.70052, 1.42995], target: [2.99281, 0.70052, -0.49841], fov: 24, roll: 0 },
-          { t: 129.25, pos: [0.77481, 0.70099, 1.52544], target: [3.07294, 0.70099, -0.40292], fov: 24, roll: 0 },
-          { t: 129.5, pos: [0.91702, 0.70168, 1.69493], target: [3.21516, 0.70168, -0.23344], fov: 24, roll: 0 },
-          { t: 129.75, pos: [1.05924, 0.70262, 1.86441], target: [3.35737, 0.70262, -0.06395], fov: 24, roll: 0 },
-          { t: 130, pos: [1.13936, 0.70383, 1.9599], target: [3.4375, 0.70383, 0.03154], fov: 24, roll: 0 },
-          { t: 130.25, pos: [1.21949, 0.70536, 2.05539], target: [3.51762, 0.70536, 0.12703], fov: 24, roll: 0 },
-          { t: 130.5, pos: [1.3617, 0.70721, 2.22488], target: [3.65984, 0.70721, 0.29651], fov: 24, roll: 0 },
-          { t: 130.75, pos: [1.50334, 0.70941, 2.39367], target: [3.80147, 0.70941, 0.46531], fov: 24, roll: 0 },
-          { t: 131, pos: [1.61196, 0.71199, 2.52312], target: [3.91009, 0.71199, 0.59475], fov: 24, roll: 0 },
-          { t: 131.25, pos: [1.72779, 0.71495, 2.66116], target: [4.02592, 0.71495, 0.73279], fov: 24, roll: 0 },
-          { t: 131.5, pos: [1.84362, 0.71831, 2.7992], target: [4.14175, 0.71831, 0.87084], fov: 24, roll: 0 },
-          { t: 131.75, pos: [1.95945, 0.72208, 2.93724], target: [4.25758, 0.72208, 1.00888], fov: 24, roll: 0 },
-          { t: 132, pos: [2.07528, 0.72627, 3.07528], target: [4.37341, 0.72627, 1.14692], fov: 24, roll: 0 },
-          { t: 132.25, pos: [2.19111, 0.73088, 3.21332], target: [4.48924, 0.73088, 1.28496], fov: 24, roll: 0 },
-          { t: 132.5, pos: [2.30694, 0.73592, 3.35137], target: [4.60507, 0.73592, 1.423], fov: 24, roll: 0 },
-          { t: 132.75, pos: [2.42277, 0.74139, 3.48941], target: [4.7209, 0.74139, 1.56104], fov: 24, roll: 0 },
-          { t: 133, pos: [2.5386, 0.74729, 3.62745], target: [4.83673, 0.74729, 1.69909], fov: 24, roll: 0 },
-          { t: 133.25, pos: [2.65443, 0.75361, 3.76549], target: [4.95257, 0.75361, 1.83713], fov: 24, roll: 0 },
-          { t: 133.5, pos: [2.77026, 0.76036, 3.90353], target: [5.0684, 0.76036, 1.97517], fov: 24, roll: 0 },
-          { t: 133.75, pos: [2.88179, 0.76752, 4.03644], target: [5.17992, 0.76752, 2.10808], fov: 24, roll: 0 },
-          { t: 134, pos: [3.08909, 0.77508, 4.28349], target: [5.38722, 0.77508, 2.35513], fov: 24, roll: 0 },
-          { t: 134.25, pos: [3.35019, 0.78305, 4.59466], target: [5.64832, 0.78305, 2.6663], fov: 24, roll: 0 },
-          { t: 134.5, pos: [3.61129, 0.79139, 4.90583], target: [5.90942, 0.79139, 2.97746], fov: 24, roll: 0 },
-          { t: 134.75, pos: [3.87239, 0.80011, 5.21699], target: [6.17052, 0.80011, 3.28863], fov: 24, roll: 0 },
-          { t: 135, pos: [4.13349, 0.80919, 5.52816], target: [6.43162, 0.80919, 3.5998], fov: 24, roll: 0 },
-          { t: 135.25, pos: [4.39459, 0.81861, 5.83933], target: [6.69272, 0.81861, 3.91097], fov: 24, roll: 0 },
-          { t: 135.5, pos: [4.65569, 0.82835, 6.1505], target: [6.95382, 0.82835, 4.22213], fov: 24, roll: 0 },
-          { t: 135.75, pos: [4.91679, 0.8384, 6.46166], target: [7.21492, 0.8384, 4.5333], fov: 24, roll: 0 },
-          { t: 136, pos: [5.17789, 0.84874, 6.77283], target: [7.47602, 0.84874, 4.84447], fov: 24, roll: 0 },
-          { t: 136.25, pos: [5.43899, 0.85934, 7.084], target: [7.73712, 0.85934, 5.15564], fov: 24, roll: 0 },
-          { t: 136.5, pos: [5.70009, 0.87019, 7.39517], target: [7.99823, 0.87019, 5.4668], fov: 24, roll: 0 },
-          { t: 136.75, pos: [5.96119, 0.88126, 7.70633], target: [8.25933, 0.88126, 5.77797], fov: 24, roll: 0 },
-          { t: 137, pos: [6.22229, 0.89253, 8.0175], target: [8.52043, 0.89253, 6.08914], fov: 24, roll: 0 },
-          { t: 137.25, pos: [6.48339, 0.90398, 8.32867], target: [8.78153, 0.90398, 6.40031], fov: 24, roll: 0 },
-          { t: 137.5, pos: [6.74449, 0.91558, 8.63984], target: [9.04263, 0.91558, 6.71147], fov: 24, roll: 0 },
-          { t: 137.75, pos: [7.00685, 0.92731, 8.9525], target: [9.30499, 0.92731, 7.02414], fov: 24, roll: 0 },
-          { t: 138, pos: [7.24124, 0.93914, 9.23184], target: [9.53937, 0.93914, 7.30347], fov: 24, roll: 0 },
-          { t: 138.25, pos: [7.45992, 0.95105, 9.49245], target: [9.75805, 0.95105, 7.56408], fov: 24, roll: 0 },
-          { t: 138.5, pos: [7.67859, 0.96301, 9.75305], target: [9.97673, 0.96301, 7.82469], fov: 24, roll: 0 },
-          { t: 138.75, pos: [7.89727, 0.975, 10.01366], target: [10.1954, 0.975, 8.0853], fov: 24, roll: 0 },
-          { t: 139, pos: [8.11595, 0.98699, 10.27427], target: [10.41408, 0.98699, 8.34591], fov: 24, roll: 0 },
-          { t: 139.25, pos: [8.33462, 0.99895, 10.53488], target: [10.63276, 0.99895, 8.60652], fov: 24, roll: 0 },
-          { t: 139.5, pos: [8.5533, 1.01086, 10.79549], target: [10.85143, 1.01086, 8.86713], fov: 24, roll: 0 },
-          { t: 139.75, pos: [8.77198, 1.02269, 11.0561], target: [11.07011, 1.02269, 9.12773], fov: 24, roll: 0 },
-          { t: 140, pos: [8.99065, 1.03442, 11.31671], target: [11.28879, 1.03442, 9.38834], fov: 24, roll: 0 },
-          { t: 140.25, pos: [9.20933, 1.04602, 11.57731], target: [11.50746, 1.04602, 9.64895], fov: 24, roll: 0 },
-          { t: 140.5, pos: [9.42801, 1.05747, 11.83792], target: [11.72614, 1.05747, 9.90956], fov: 24, roll: 0 },
-          { t: 140.75, pos: [9.64668, 1.06874, 12.09853], target: [11.94482, 1.06874, 10.17017], fov: 24, roll: 0 },
-          { t: 141, pos: [9.86536, 1.07981, 12.35914], target: [12.16349, 1.07981, 10.43078], fov: 24, roll: 0 },
-          { t: 141.25, pos: [10.08404, 1.09066, 12.61975], target: [12.38217, 1.09066, 10.69139], fov: 24, roll: 0 },
-          { t: 141.5, pos: [10.30271, 1.10126, 12.88036], target: [12.60085, 1.10126, 10.952], fov: 24, roll: 0 },
-          { t: 141.75, pos: [10.52328, 1.1116, 13.14321], target: [12.82141, 1.1116, 11.21485], fov: 24, roll: 0 },
-          { t: 142, pos: [10.70189, 1.12165, 13.35607], target: [13.00002, 1.12165, 11.42771], fov: 24, roll: 0 },
-          { t: 142.25, pos: [10.85693, 1.13139, 13.54084], target: [13.15506, 1.13139, 11.61248], fov: 24, roll: 0 },
-          { t: 142.5, pos: [11.01197, 1.14081, 13.72561], target: [13.3101, 1.14081, 11.79725], fov: 24, roll: 0 },
-          { t: 142.75, pos: [11.16701, 1.14989, 13.91038], target: [13.46514, 1.14989, 11.98202], fov: 24, roll: 0 },
-          { t: 143, pos: [11.32205, 1.15861, 14.09515], target: [13.62018, 1.15861, 12.16679], fov: 24, roll: 0 },
-          { t: 143.25, pos: [11.47709, 1.16695, 14.27992], target: [13.77522, 1.16695, 12.35156], fov: 24, roll: 0 },
-          { t: 143.5, pos: [11.63213, 1.17492, 14.46469], target: [13.93026, 1.17492, 12.53633], fov: 24, roll: 0 },
-          { t: 143.75, pos: [11.78717, 1.18248, 14.64946], target: [14.0853, 1.18248, 12.7211], fov: 24, roll: 0 },
-          { t: 144, pos: [11.94221, 1.18964, 14.83423], target: [14.24034, 1.18964, 12.90587], fov: 24, roll: 0 },
-          { t: 144.25, pos: [12.09725, 1.19639, 15.01901], target: [14.39539, 1.19639, 13.09064], fov: 24, roll: 0 },
-          { t: 144.5, pos: [12.25229, 1.20271, 15.20378], target: [14.55043, 1.20271, 13.27541], fov: 24, roll: 0 },
-          { t: 144.75, pos: [12.40723, 1.20861, 15.38843], target: [14.70537, 1.20861, 13.46006], fov: 24, roll: 0 },
-          { t: 145, pos: [12.55932, 1.21408, 15.56967], target: [14.85745, 1.21408, 13.64131], fov: 24, roll: 0 },
-          { t: 145.25, pos: [12.71265, 1.21912, 15.75241], target: [15.01079, 1.21912, 13.82405], fov: 24, roll: 0 },
-          { t: 145.5, pos: [12.88547, 1.22373, 15.95836], target: [15.1836, 1.22373, 14.03], fov: 24, roll: 0 },
-          { t: 145.75, pos: [13.05828, 1.22792, 16.16432], target: [15.35641, 1.22792, 14.23595], fov: 24, roll: 0 },
-          { t: 146, pos: [13.21162, 1.23169, 16.34705], target: [15.50975, 1.23169, 14.41869], fov: 24, roll: 0 },
-          { t: 146.25, pos: [13.36495, 1.23505, 16.52979], target: [15.66309, 1.23505, 14.60143], fov: 24, roll: 0 },
-          { t: 146.5, pos: [13.53777, 1.23801, 16.73575], target: [15.8359, 1.23801, 14.80738], fov: 24, roll: 0 },
-          { t: 146.75, pos: [13.71058, 1.24059, 16.9417], target: [16.00872, 1.24059, 15.01334], fov: 24, roll: 0 },
-          { t: 147, pos: [13.86392, 1.24279, 17.12444], target: [16.16205, 1.24279, 15.19608], fov: 24, roll: 0 },
-          { t: 147.25, pos: [14.01726, 1.24464, 17.30718], target: [16.31539, 1.24464, 15.37881], fov: 24, roll: 0 },
-          { t: 147.5, pos: [14.19007, 1.24617, 17.51313], target: [16.4882, 1.24617, 15.58477], fov: 24, roll: 0 },
-          { t: 147.75, pos: [14.36222, 1.24738, 17.71829], target: [16.66036, 1.24738, 15.78993], fov: 24, roll: 0 },
-          { t: 148, pos: [14.53471, 1.24832, 17.92385], target: [16.83284, 1.24832, 15.99549], fov: 24, roll: 0 },
-          { t: 148.25, pos: [14.71546, 1.24901, 18.13926], target: [17.01359, 1.24901, 16.2109], fov: 24, roll: 0 },
-          { t: 148.5, pos: [14.89621, 1.24948, 18.35468], target: [17.19434, 1.24948, 16.42631], fov: 24, roll: 0 },
-          { t: 148.75, pos: [15.07696, 1.24978, 18.57009], target: [17.3751, 1.24978, 16.64172], fov: 24, roll: 0 },
-          { t: 149, pos: [15.2774, 1.24993, 18.80896], target: [17.57554, 1.24993, 16.8806], fov: 24, roll: 0 },
-          { t: 149.25, pos: [15.59076, 1.24999, 19.1824], target: [17.88889, 1.24999, 17.25404], fov: 24, roll: 0 },
-          { t: 149.5, pos: [15.86204, 1.25, 19.5057], target: [18.16017, 1.25, 17.57734], fov: 24, roll: 0 },
-          { t: 149.75, pos: [15.96961, 1.25, 19.6339], target: [18.26774, 1.25, 17.70554], fov: 24, roll: 0 },
-          { t: 150, pos: [15.99041, 1.25111, 19.65869], target: [18.28854, 1.25111, 17.73033], fov: 24, roll: 0 },
-          { t: 150.25, pos: [15.99041, 1.28697, 19.65869], target: [18.28854, 1.28697, 17.73033], fov: 24, roll: 0 },
-          { t: 150.5, pos: [15.99041, 1.57625, 19.65869], target: [18.28854, 1.57625, 17.73033], fov: 24, roll: 0 },
-          { t: 150.75, pos: [15.99041, 2.05727, 19.65869], target: [18.28854, 2.05727, 17.73033], fov: 24, roll: 0 },
-          { t: 151, pos: [15.99041, 2.12054, 19.65869], target: [18.28854, 2.12054, 17.73033], fov: 24, roll: 0 },
-          { t: 151.25, pos: [15.99041, 2.12054, 19.65869], target: [18.28854, 2.12054, 17.73033], fov: 24, roll: 0 },
-          { t: 151.5, pos: [15.90622, 2.12054, 19.72933], target: [18.20435, 2.12054, 17.80097], fov: 24, roll: 0 },
-          { t: 151.75, pos: [15.38745, 2.12054, 20.16463], target: [17.68559, 2.12054, 18.23627], fov: 24, roll: 0 },
-          { t: 152, pos: [14.17936, 2.12054, 21.17834], target: [16.47749, 2.12054, 19.24998], fov: 24, roll: 0 },
-          { t: 152.25, pos: [12.19463, 2.12054, 22.84373], target: [14.49276, 2.12054, 20.91537], fov: 24, roll: 0 },
-          { t: 152.5, pos: [9.48181, 2.12054, 25.12005], target: [11.77994, 2.12054, 23.19169], fov: 24, roll: 0 },
-          { t: 152.75, pos: [6.19372, 2.12054, 27.87909], target: [8.49185, 2.12054, 25.95073], fov: 24, roll: 0 },
-          { t: 153, pos: [2.55582, 2.12054, 30.93165], target: [4.85396, 2.12054, 29.00328], fov: 24, roll: 0 },
-          { t: 153.25, pos: [-1.16532, 2.12054, 34.05406], target: [1.13281, 2.12054, 32.12569], fov: 24, roll: 0 },
-          { t: 153.5, pos: [-4.69368, 2.12054, 37.01471], target: [-2.39555, 2.12054, 35.08634], fov: 24, roll: 0 },
-          { t: 153.75, pos: [-7.77536, 2.12054, 39.60054], target: [-5.47723, 2.12054, 37.67218], fov: 24, roll: 0 },
-          { t: 154, pos: [-10.21015, 2.12054, 41.64357], target: [-7.91202, 2.12054, 39.71521], fov: 24, roll: 0 },
-          { t: 154.25, pos: [-11.88316, 2.12054, 43.04739], target: [-9.58502, 2.12054, 41.11903], fov: 24, roll: 0 },
-          { t: 154.5, pos: [-12.79637, 2.12054, 43.81367], target: [-10.49824, 2.12054, 41.88531], fov: 24, roll: 0 },
-          { t: 154.75, pos: [-13.1003, 2.12054, 44.06869], target: [-10.80217, 2.12054, 42.14033], fov: 24, roll: 0 },
-          { t: 155, pos: [-13.11928, 2.12054, 44.08462], target: [-10.82115, 2.12054, 42.15626], fov: 24, roll: 0 } ],
+          { t: 127.36, pos: [0.205, 0.42, 0.84638], target: [2.49999, 0.57701, -1.07934], fov: 24, roll: 0 },
+          { t: 127.75, pos: [0.205, 0.42, 0.84638], target: [2.49999, 0.57701, -1.07934], fov: 24, roll: 0 },
+          { t: 128, pos: [0.205, 0.42, 0.84638], target: [2.49999, 0.57701, -1.07934], fov: 24, roll: 0 },
+          { t: 128.25, pos: [0.205, 0.42, 0.84638], target: [2.49999, 0.57701, -1.07934], fov: 24, roll: 0 },
+          { t: 128.5, pos: [0.205, 0.42, 0.84638], target: [2.49999, 0.57701, -1.07934], fov: 24, roll: 0 },
+          { t: 128.75, pos: [0.19826, 0.42, 0.83834], target: [2.49325, 0.57701, -1.08738], fov: 24, roll: 0 },
+          { t: 129, pos: [0.11241, 0.42, 0.73602], target: [2.40739, 0.57701, -1.1897], fov: 24, roll: 0 },
+          { t: 129.25, pos: [0.00317, 0.42, 0.60584], target: [2.29816, 0.57701, -1.31988], fov: 24, roll: 0 },
+          { t: 129.5, pos: [-0.0538, 0.42, 0.53795], target: [2.24119, 0.57701, -1.38777], fov: 24, roll: 0 },
+          { t: 129.75, pos: [-0.07613, 0.42, 0.51134], target: [2.21886, 0.57701, -1.41438], fov: 24, roll: 0 },
+          { t: 130, pos: [-0.08313, 0.42, 0.50299], target: [2.21185, 0.57701, -1.42273], fov: 24, roll: 0 },
+          { t: 130.25, pos: [-0.08555, 0.42, 0.50011], target: [2.20944, 0.57701, -1.42561], fov: 24, roll: 0 },
+          { t: 130.5, pos: [-0.10366, 0.41878, 0.47853], target: [2.19133, 0.57569, -1.4472], fov: 24, roll: 0 },
+          { t: 130.75, pos: [-0.0088, 0.41083, 0.59158], target: [2.28622, 0.56703, -1.33417], fov: 24, roll: 0 },
+          { t: 131, pos: [0.28791, 0.39484, 0.94518], target: [2.58298, 0.54965, -0.98062], fov: 24, roll: 0 },
+          { t: 131.25, pos: [0.73272, 0.37315, 1.47529], target: [3.02787, 0.52607, -0.45057], fov: 24, roll: 0 },
+          { t: 131.5, pos: [1.236, 0.34931, 2.07507], target: [3.53123, 0.50016, 0.14915], fov: 24, roll: 0 },
+          { t: 131.75, pos: [1.70602, 0.32715, 2.63522], target: [4.00132, 0.47606, 0.70924], fov: 24, roll: 0 },
+          { t: 132, pos: [2.05963, 0.31052, 3.05663], target: [4.35499, 0.45799, 1.1306], fov: 24, roll: 0 },
+          { t: 132.25, pos: [2.24278, 0.30265, 3.2749], target: [4.53816, 0.44944, 1.34885], fov: 24, roll: 0 },
+          { t: 132.5, pos: [2.31, 0.30047, 3.35501], target: [4.60539, 0.44706, 1.42896], fov: 24, roll: 0 },
+          { t: 132.75, pos: [2.33033, 0.30004, 3.37924], target: [4.62572, 0.44659, 1.45318], fov: 24, roll: 0 },
+          { t: 133, pos: [2.33477, 0.3, 3.38453], target: [4.63016, 0.44655, 1.45847], fov: 24, roll: 0 },
+          { t: 133.25, pos: [2.33527, 0.3, 3.38513], target: [4.63066, 0.44655, 1.45907], fov: 24, roll: 0 },
+          { t: 133.5, pos: [2.33527, 0.3, 3.38513], target: [4.63066, 0.44655, 1.45907], fov: 24, roll: 0 },
+          { t: 133.75, pos: [2.37208, 0.29869, 3.429], target: [4.66748, 0.44498, 1.50293], fov: 24, roll: 0 },
+          { t: 134, pos: [2.61841, 0.29036, 3.72257], target: [4.91387, 0.43502, 1.79645], fov: 24, roll: 0 },
+          { t: 134.25, pos: [3.0952, 0.27452, 4.29077], target: [5.39077, 0.41607, 2.36456], fov: 24, roll: 0 },
+          { t: 134.5, pos: [3.70482, 0.25489, 5.01729], target: [6.00053, 0.39259, 3.09096], fov: 24, roll: 0 },
+          { t: 134.75, pos: [4.2676, 0.23657, 5.68799], target: [6.56344, 0.37067, 3.76156], fov: 24, roll: 0 },
+          { t: 135, pos: [4.60064, 0.22495, 6.0849], target: [6.89656, 0.35678, 4.1584], fov: 24, roll: 0 },
+          { t: 135.25, pos: [4.71049, 0.22104, 6.21581], target: [7.00643, 0.35211, 4.28928], fov: 24, roll: 0 },
+          { t: 135.5, pos: [4.74313, 0.22013, 6.2547], target: [7.03907, 0.35102, 4.32817], fov: 24, roll: 0 },
+          { t: 135.75, pos: [4.74929, 0.22001, 6.26204], target: [7.04523, 0.35086, 4.33551], fov: 24, roll: 0 },
+          { t: 136, pos: [4.74934, 0.22, 6.26211], target: [7.04529, 0.35086, 4.33558], fov: 24, roll: 0 },
+          { t: 136.25, pos: [4.74914, 0.22, 6.26187], target: [7.04509, 0.35086, 4.33534], fov: 24, roll: 0 },
+          { t: 136.5, pos: [4.74914, 0.22, 6.26187], target: [7.04509, 0.35086, 4.33534], fov: 24, roll: 0 },
+          { t: 136.75, pos: [4.74914, 0.22, 6.26187], target: [7.04509, 0.35086, 4.33534], fov: 24, roll: 0 },
+          { t: 137, pos: [4.75053, 0.22034, 6.26353], target: [7.04648, 0.35124, 4.337], fov: 24, roll: 0 },
+          { t: 137.25, pos: [4.81535, 0.24913, 6.34078], target: [7.1112, 0.38294, 4.41433], fov: 24, roll: 0 },
+          { t: 137.5, pos: [5.04918, 0.34609, 6.61944], target: [7.34468, 0.48976, 4.69329], fov: 24, roll: 0 },
+          { t: 137.75, pos: [5.47849, 0.50616, 7.13107], target: [7.77335, 0.66608, 5.20545], fov: 24, roll: 0 },
+          { t: 138, pos: [6.02735, 0.7036, 7.78518], target: [8.32135, 0.88356, 5.86029], fov: 24, roll: 0 },
+          { t: 138.25, pos: [6.58518, 0.90644, 8.44997], target: [8.87817, 1.10698, 6.52592], fov: 24, roll: 0 },
+          { t: 138.5, pos: [7.06152, 1.08162, 9.01765], target: [9.35356, 1.29992, 7.0944], fov: 24, roll: 0 },
+          { t: 138.75, pos: [7.38409, 1.19601, 9.40207], target: [9.67546, 1.42592, 7.47938], fov: 24, roll: 0 },
+          { t: 139, pos: [7.51879, 1.23799, 9.56261], target: [9.80991, 1.47216, 7.64013], fov: 24, roll: 0 },
+          { t: 139.25, pos: [7.56392, 1.24829, 9.6164], target: [9.85498, 1.48349, 7.69397], fov: 24, roll: 0 },
+          { t: 139.5, pos: [7.57581, 1.24991, 9.63056], target: [9.86686, 1.48527, 7.70814], fov: 24, roll: 0 },
+          { t: 139.75, pos: [7.57773, 1.25, 9.63285], target: [9.86878, 1.48538, 7.71043], fov: 24, roll: 0 },
+          { t: 140, pos: [7.57779, 1.25, 9.63292], target: [9.86884, 1.48538, 7.7105], fov: 24, roll: 0 },
+          { t: 140.25, pos: [7.57778, 1.25, 9.63291], target: [9.86883, 1.48538, 7.71049], fov: 24, roll: 0 },
+          { t: 140.5, pos: [7.57778, 1.25, 9.63291], target: [9.86883, 1.48538, 7.71049], fov: 24, roll: 0 },
+          { t: 140.75, pos: [7.57778, 1.25, 9.63291], target: [9.86883, 1.48538, 7.71049], fov: 24, roll: 0 },
+          { t: 141, pos: [7.57778, 1.25, 9.63291], target: [9.86883, 1.48538, 7.71049], fov: 24, roll: 0 },
+          { t: 141.25, pos: [7.57778, 1.25, 9.63291], target: [9.86883, 1.48538, 7.71049], fov: 24, roll: 0 },
+          { t: 141.5, pos: [7.57897, 1.24981, 9.63432], target: [9.87002, 1.48517, 7.7119], fov: 24, roll: 0 },
+          { t: 141.75, pos: [7.66983, 1.23354, 9.74261], target: [9.96095, 1.46771, 7.82013], fov: 24, roll: 0 },
+          { t: 142, pos: [7.97888, 1.17713, 10.11092], target: [10.27025, 1.40719, 8.18824], fov: 24, roll: 0 },
+          { t: 142.25, pos: [8.50069, 1.07998, 10.73279], target: [10.79247, 1.30294, 8.80976], fov: 24, roll: 0 },
+          { t: 142.5, pos: [9.16255, 0.95245, 11.52157], target: [11.45485, 1.16611, 9.5981], fov: 24, roll: 0 },
+          { t: 142.75, pos: [9.87199, 0.80826, 12.36704], target: [12.16485, 1.01139, 10.4431], fov: 24, roll: 0 },
+          { t: 143, pos: [10.53943, 0.66171, 13.16247], target: [12.83283, 0.85414, 11.23808], fov: 24, roll: 0 },
+          { t: 143.25, pos: [11.08773, 0.52714, 13.8159], target: [13.3816, 0.70974, 11.89112], fov: 24, roll: 0 },
+          { t: 143.5, pos: [11.45491, 0.41887, 14.25349], target: [13.74914, 0.59355, 12.3284], fov: 24, roll: 0 },
+          { t: 143.75, pos: [11.63115, 0.35123, 14.46353], target: [13.9256, 0.52098, 12.53825], fov: 24, roll: 0 },
+          { t: 144, pos: [11.69448, 0.32687, 14.539], target: [13.98901, 0.49484, 12.61366], fov: 24, roll: 0 },
+          { t: 144.25, pos: [11.71296, 0.32097, 14.56102], target: [14.00751, 0.48851, 12.63567], fov: 24, roll: 0 },
+          { t: 144.5, pos: [11.71686, 0.32005, 14.56567], target: [14.01141, 0.48752, 12.64031], fov: 24, roll: 0 },
+          { t: 144.75, pos: [11.71731, 0.32, 14.5662], target: [14.01186, 0.48746, 12.64085], fov: 24, roll: 0 },
+          { t: 145, pos: [11.71732, 0.32, 14.56622], target: [14.01187, 0.48746, 12.64086], fov: 24, roll: 0 },
+          { t: 145.25, pos: [11.71732, 0.32, 14.56621], target: [14.01187, 0.48746, 12.64086], fov: 24, roll: 0 },
+          { t: 145.5, pos: [11.73146, 0.32208, 14.58308], target: [14.02601, 0.48962, 12.65772], fov: 24, roll: 0 },
+          { t: 145.75, pos: [11.87352, 0.34416, 14.75237], target: [14.16803, 0.51247, 12.82704], fov: 24, roll: 0 },
+          { t: 146, pos: [12.17722, 0.3931, 15.1143], target: [14.47166, 0.56311, 13.18904], fov: 24, roll: 0 },
+          { t: 146.25, pos: [12.57102, 0.45962, 15.58362], target: [14.86536, 0.63196, 13.65844], fov: 24, roll: 0 },
+          { t: 146.5, pos: [12.97241, 0.52872, 16.06198], target: [15.26664, 0.70346, 14.13689], fov: 24, roll: 0 },
+          { t: 146.75, pos: [13.31225, 0.58388, 16.46699], target: [15.6064, 0.76054, 14.54197], fov: 24, roll: 0 },
+          { t: 147, pos: [13.50414, 0.61079, 16.69567], target: [15.79825, 0.78839, 14.77069], fov: 24, roll: 0 },
+          { t: 147.25, pos: [13.57763, 0.61836, 16.78325], target: [15.87172, 0.79622, 14.85828], fov: 24, roll: 0 },
+          { t: 147.5, pos: [13.60092, 0.61985, 16.81101], target: [15.89501, 0.79777, 14.88604], fov: 24, roll: 0 },
+          { t: 147.75, pos: [13.60636, 0.62, 16.81749], target: [15.90045, 0.79792, 14.89252], fov: 24, roll: 0 },
+          { t: 148, pos: [13.62308, 0.62263, 16.83742], target: [15.91718, 0.80042, 14.91245], fov: 24, roll: 0 },
+          { t: 148.25, pos: [13.7847, 0.65077, 17.03002], target: [16.07885, 0.82719, 15.105], fov: 24, roll: 0 },
+          { t: 148.5, pos: [14.13279, 0.71396, 17.44486], target: [16.42708, 0.88731, 15.51972], fov: 24, roll: 0 },
+          { t: 148.75, pos: [14.58838, 0.80174, 17.98781], target: [16.88286, 0.97082, 16.06251], fov: 24, roll: 0 },
+          { t: 149, pos: [15.03703, 0.89647, 18.5225], target: [17.33171, 1.06094, 16.59704], fov: 24, roll: 0 },
+          { t: 149.25, pos: [15.38833, 0.97869, 18.94116], target: [17.68317, 1.13916, 17.01556], fov: 24, roll: 0 },
+          { t: 149.5, pos: [15.60324, 1.0291, 19.19728], target: [17.89819, 1.18711, 17.27159], fov: 24, roll: 0 },
+          { t: 149.75, pos: [15.70575, 1.10694, 19.31945], target: [18.00103, 1.25648, 17.39348], fov: 24, roll: 0 },
+          { t: 150, pos: [15.78518, 1.34384, 19.41411], target: [18.08147, 1.46393, 17.48729], fov: 24, roll: 0 },
+          { t: 150.25, pos: [15.86905, 1.70455, 19.51406], target: [18.16647, 1.77936, 17.58629], fov: 24, roll: 0 },
+          { t: 150.5, pos: [15.94492, 2.05303, 19.60447], target: [18.24293, 2.08406, 17.67621], fov: 24, roll: 0 },
+          { t: 150.75, pos: [15.98933, 2.25861, 19.6574], target: [18.28746, 2.26381, 17.72904], fov: 24, roll: 0 },
+          { t: 151, pos: [15.99827, 2.3, 19.66806], target: [18.2964, 2.3, 17.73969], fov: 24, roll: 0 },
+          { t: 151.25, pos: [15.99827, 2.3, 19.66806], target: [18.2964, 2.3, 17.73969], fov: 24, roll: 0 },
+          { t: 151.5, pos: [15.91408, 2.3, 19.7387], target: [18.21221, 2.3, 17.81034], fov: 24, roll: 0 },
+          { t: 151.75, pos: [15.39531, 2.3, 20.174], target: [17.69345, 2.3, 18.24563], fov: 24, roll: 0 },
+          { t: 152, pos: [14.18722, 2.3, 21.18771], target: [16.48535, 2.3, 19.25935], fov: 24, roll: 0 },
+          { t: 152.25, pos: [12.20249, 2.3, 22.8531], target: [14.50062, 2.3, 20.92473], fov: 24, roll: 0 },
+          { t: 152.5, pos: [9.48967, 2.3, 25.12942], target: [11.7878, 2.3, 23.20106], fov: 24, roll: 0 },
+          { t: 152.75, pos: [6.20158, 2.3, 27.88846], target: [8.49971, 2.3, 25.9601], fov: 24, roll: 0 },
+          { t: 153, pos: [2.56368, 2.3, 30.94101], target: [4.86182, 2.3, 29.01265], fov: 24, roll: 0 },
+          { t: 153.25, pos: [-1.15746, 2.3, 34.06342], target: [1.14067, 2.3, 32.13506], fov: 24, roll: 0 },
+          { t: 153.5, pos: [-4.68583, 2.3, 37.02407], target: [-2.38769, 2.3, 35.09571], fov: 24, roll: 0 },
+          { t: 153.75, pos: [-7.7675, 2.3, 39.60991], target: [-5.46937, 2.3, 37.68154], fov: 24, roll: 0 },
+          { t: 154, pos: [-10.20229, 2.3, 41.65294], target: [-7.90416, 2.3, 39.72458], fov: 24, roll: 0 },
+          { t: 154.25, pos: [-11.8753, 2.3, 43.05676], target: [-9.57716, 2.3, 41.12839], fov: 24, roll: 0 },
+          { t: 154.5, pos: [-12.78851, 2.3, 43.82304], target: [-10.49038, 2.3, 41.89467], fov: 24, roll: 0 },
+          { t: 154.75, pos: [-13.09244, 2.3, 44.07806], target: [-10.79431, 2.3, 42.1497], fov: 24, roll: 0 },
+          { t: 155, pos: [-13.11142, 2.3, 44.09399], target: [-10.81329, 2.3, 42.16562], fov: 24, roll: 0 } ],
   VII:  [ { t: 153.0, pos: [0, 0, 1], target: [0, 0, 0], fov: 50, roll: 0 },
           { t: 180.6, pos: [0, 0, 1], target: [0, 0, 0], fov: 50, roll: 0 } ],
   // VIII: metres (desk top y = 0). 159.2–160.3 the caret held at the exact centre (targets on the

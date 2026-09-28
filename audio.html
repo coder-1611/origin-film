@@ -5,13 +5,14 @@
 <script type="module">
 import { renderOffline } from './src/audio/engine.js';
 const log = (m) => { document.getElementById('log').textContent += '\n' + m; console.log('[score] ' + m); };
-window.__renderScore = async () => {
-  const buf = await renderOffline(log);
+window.__renderScore = async (opts = {}) => {
+  const buf = await renderOffline(log, opts);
   const L = buf.getChannelData(0), R = buf.getChannelData(1);
   const inter = new Float32Array(L.length * 2);
   let peak = 0;
   for (let i = 0; i < L.length; i++) { inter[2 * i] = L[i]; inter[2 * i + 1] = R[i]; peak = Math.max(peak, Math.abs(L[i]), Math.abs(R[i])); }
-  const res = await fetch('/__upload?name=score-raw.f32', { method: 'POST', body: inter.buffer });
+  const name = opts.from !== undefined && opts.from !== null ? `audition-${opts.from}-${opts.to}.f32` : 'score-raw.f32';
+  const res = await fetch('/__upload?name=' + name, { method: 'POST', body: inter.buffer });
   return { frames: L.length, sampleRate: buf.sampleRate, peak, upload: res.status };
 };
 </script>

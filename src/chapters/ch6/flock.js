@@ -4,12 +4,13 @@
 //   B … B+2        the birds climb out over the sea toward the sun
 //   B+2 … the end  a murmuration wheeling in the sunset sky above the march, framed by its camera
 import * as L from './layout.js';
+import { marchPlan } from '../../march/plan.js';
 
 export const CM = [0.05, -0.43, -0.95];                // bait-ball (mill) centre
 
 export const makeFlockGoal = (T) => {
   const ss = T.smootherstep, pwl = T.pwl;
-  const B = T.BREACH_T, M0 = T.march.t0, TO = T.march.torch;
+  const MP = marchPlan(), B = T.BREACH_T, M0 = MP.t0, TO = MP.torch;
   const RISE0 = B - 0.5, RISE_SPAN = 0.72;           // each fish turns up at RISE0 + trait·RISE_SPAN
   const f = [Math.sin(L.SUN_AZ), 0, -Math.cos(L.SUN_AZ)], rt = [Math.cos(L.SUN_AZ), 0, Math.sin(L.SUN_AZ)];
   // the murmuration's centre: ~44 m out toward the sun, 5 m up, a little right of centre; it

@@ -3,13 +3,15 @@
 // Not imported by the chapter at runtime, except for the walk frame (MARCH_FRAME), which must agree.
 //   105–113.9   macro on the live colony, crane back and up, rise through the surface
 //   114–126     over-under at the waterline (the forest sprouts; the school gathers; the breach at B)
-//   B … B+1.4   tilt up with the rising flock, swing right to the sun, level off, zoom in
-//   B+1.4 … 151 the march: level, looking at the sun on the horizon (screen centre); trucking so the
-//               lead walker's screen x = T.marchX(t); craning up with the raised torch so its flame
-//               lands exactly on the horizon at the centre when it catches (T.march.torch)
+//   B … B+1.4   tilt up with the rising flock, swing right to the sun, level off, low over the wash
+//   B+1.4 … 151 the shore: the documentary drift of src/march/camera.js (each animal met in turn, the
+//               camera lower and closer for small animals), settling so the torch flame is at the exact
+//               centre with the horizon through it at the catch (a key lands exactly on it)
 //   151.25–155  night: dolly straight back along the axis (the flame stays centred and shrinks)
 import * as L from './layout.js';
-import { makeMarch, MARCH_D, MARCH_FOV } from './march.js';
+import { ZC, TORCH } from '../../march/beats.js';
+import { makeCast } from '../../march/beats.js';
+import { makeCamera } from '../../march/camera.js';
 const { DEG } = L;
 
 export const add = (a, b, s = 1) => a.map((v, i) => v + b[i] * s);
@@ -24,25 +26,19 @@ const A = L.SUN_AZ;
 export const MARCH_FRAME = {
   X: [Math.cos(A), 0, Math.sin(A)],
   Z: [-Math.sin(A), 0, Math.cos(A)],
-  start: [0.25, 0.7, 0.9],                 // world camera position at march.t0
+  start: [0.25, 0.7, 0.9],                 // world position of the walk-local point (0, 0.7, ZC)
 };
-MARCH_FRAME.O = add(MARCH_FRAME.start, MARCH_FRAME.Z, -MARCH_D).map((v, i) => i === 1 ? 0 : v);
+MARCH_FRAME.O = add(MARCH_FRAME.start, MARCH_FRAME.Z, -ZC).map((v, i) => i === 1 ? 0 : v);
 
-export function marchCamera(T, m, t) {
+/** A camera key (world) from the pure drift camera's state c = { x, h, z, pitch, fov } (walk-local). */
+export function worldKey(c, t) {
   const F = MARCH_FRAME;
-  const M = T.march;
-  const hWalk = 0.7 + 0.55 * T.smootherstep(M.t0, m.lastStep, t);
-  const fl = m.at(Math.min(t, M.torch)).flame;
-  const aimY = fl ? fl[1] + (m.flameEnd[1] - m.at(M.torch).flame[1]) : 0;      // the flame's visual centre
-  const h = fl ? hWalk + (aimY - hWalk) * T.smootherstep(M.standAt - 0.1, M.torch - 0.05, t) : hWalk;
-  const dolly = 38 * T.smootherstep(M.torch + 0.25, T.chapterWindow('VI')[1] - 0.1, t);
-  const x = m.camX(t);
-  const pos = add(add(add(F.O, F.X, x), F.Z, MARCH_D + dolly), [0, 1, 0], h);
-  return { t, pos, target: add(pos, F.Z, -3), fov: MARCH_FOV, roll: 0 };
+  const pos = add(add(add(F.O, F.X, c.x), F.Z, c.z), [0, 1, 0], c.h);
+  const dir = add(F.Z.map(v => -v * Math.cos(c.pitch)), [0, 1, 0], Math.sin(c.pitch));
+  return { t, pos, target: add(pos, dir, 3), fov: c.fov, roll: 0 };
 }
 
 export function buildKeys(T) {
-  const m = makeMarch(T);
   const B = T.BREACH_T;
   const keys = [
     K(105.0, add(L.P0, L.N0, 0.16), -12),
@@ -64,11 +60,12 @@ export function buildKeys(T) {
     K(B + 0.72, [0.12, 0.36, 0.7], 27, 44, 19),
     K(B + 1.02, [0.2, 0.57, 0.82], 17, 35, 39),
   ];
-  // the march: dense samples of the walker-derived truck / crane / dolly (a key exactly at the torch)
-  keys.push(marchCamera(T, m, B + 1.36));
-  const end = T.chapterWindow('VI')[1], TO = T.march.torch;
+  // the shore: dense samples of the drift camera (a key exactly at the torch)
+  const cam = makeCamera(makeCast(), { end: T.chapterWindow('VI')[1] });
+  keys.push(worldKey(cam.at(B + 1.36), B + 1.36));
+  const end = T.chapterWindow('VI')[1], TO = TORCH;
   const t0 = TO - 0.25 * Math.floor((TO - (B + 1.6)) / 0.25 + 1e-9), n = Math.round((end - t0) / 0.25);
-  for (let i = 0; i <= n; i++) keys.push(marchCamera(T, m, +(t0 + i * 0.25).toFixed(4)));
+  for (let i = 0; i <= n; i++) { const t = +(t0 + i * 0.25).toFixed(4); keys.push(worldKey(cam.at(t), t)); }
   const r = (v) => +v.toFixed(5);
   return keys.map(k => ({ t: r(k.t), pos: k.pos.map(r), target: k.target.map(r), fov: r(k.fov), roll: 0 }));
 }

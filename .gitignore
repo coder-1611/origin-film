@@ -5,3 +5,6 @@ renders/
 .DS_Store
 tools/verify/out/
 tools/scratch/
+.vercel
+.env.local
+.env*

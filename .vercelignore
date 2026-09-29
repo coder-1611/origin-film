@@ -1,0 +1,10 @@
+node_modules
+frames
+renders
+tools
+docs/research
+audio.html
+*.wav
+*.f32
+.DS_Store
+src/package.json

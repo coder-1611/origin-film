@@ -89,7 +89,7 @@ function ksData(sr, freq, seconds, seed, { bright = 0.5, t60 = 1.2, piano = fals
 }
 
 /** The drone: additive sines on whole cycles per film (multiples of 1/DURATION Hz): exactly periodic. */
-function droneData(sr) {
+export function droneData(sr) {
   const len = Math.floor(sr * T.DURATION), L = new Float32Array(len), R = new Float32Array(len);
   const P = T.DURATION;
   const lfo = T.drone.lfoCycles;
@@ -113,7 +113,7 @@ function droneData(sr) {
 }
 
 /** Fire crackle: a granular stream of filtered noise grains, panned to the flames. */
-function crackleData(sr, ev) {
+export function crackleData(sr, ev) {
   const len = Math.floor(sr * ev.dur) + sr, L = new Float32Array(len), R = new Float32Array(len);
   const r = T.mulberry32(0xF1AE);
   let t = 0;
@@ -149,7 +149,7 @@ function crackleData(sr, ev) {
 }
 
 /** Every typed character's keyclick, panned by its key, thinning into a granular riser. */
-function keysData(sr, ev) {
+export function keysData(sr, ev) {
   const ty = T.typing, t0 = ev.t;
   const len = Math.floor(sr * (ev.dur + 0.5)), L = new Float32Array(len), R = new Float32Array(len);
   const r = T.mulberry32(0x4E75);
@@ -178,6 +178,26 @@ function keysData(sr, ev) {
   return [L, R];
 }
 
+// ------------------------------------------------------------------ nature voices (pure)
+/** Cache key of a nature event's rendered audio. */
+export function natureKey(e) {
+  return 'nat:' + e.voice + ':' + JSON.stringify(e.params || {}) + ':' + (e.dist ?? '') + ':' + e.x.toFixed(3) + ':' + (e.dur ?? '');
+}
+/** Render a nature event to placed, normalised stereo {L, R} (pure JS: runs in a worker too). */
+export function natureData(sr, e) {
+  const p = e.params || {};
+  const make = {
+    footstep: () => V.footstep(sr, p), haulout: () => V.tetrapodHaulOut(sr, p), boom: () => V.theropodBoom(sr, p),
+    hiss: () => V.lizardHiss(sr, p), bark: () => V.foxBarks(sr, p), panthoot: () => V.pantHoot(sr, p), torch: () => V.torch(sr, p),
+    frog: () => V.frogCall(sr, p), surf: () => V.surf(sr, e.dur, p), wind: () => V.wind(sr, e.dur, p), flock: () => V.flock(sr, e.dur, p),
+  }[e.voice];
+  if (!make) throw new Error('unknown nature voice ' + e.voice);
+  let x = make();
+  if (x instanceof Float32Array) x = outdoor(sr, x, { distance: e.dist ?? 12, hs: e.hs ?? 1, pan: Math.max(-1, Math.min(1, (e.x || 0) * 0.85)), seed: 7 + (natureKey(e).length % 97) });
+  normalize(x, e.peakDb ?? -6);
+  return { L: x.L, R: x.R };
+}
+
 // ------------------------------------------------------------------ the engine
 export class ScoreEngine {
   /**
@@ -188,7 +208,9 @@ export class ScoreEngine {
     this.ctx = ctx; this.live = live; this.sr = ctx.sampleRate || SR_DEFAULT;
     this.masterGainValue = masterGain;
     // Heavy JS-synthesised buffers can be shared between engine instances (live re-seeks).
-    this.cache = cache || { ks: new Map(), buffers: {} };
+    // cache.data: precomputed Float32 audio, possibly filled off-thread by warm-worker.js
+    this.cache = cache || { ks: new Map(), buffers: {}, data: {} };
+    this.cache.data = this.cache.data || {};
     this.ksCache = this.cache.ks;
     this.buffers = this.cache.buffers;
     this.voices = new Set();
@@ -603,19 +625,10 @@ export class ScoreEngine {
   // placed outdoors by distance and screen position, normalised to a per-voice reference peak,
   // precomputed once into a buffer and scheduled at the event's time (from timeline → march plan).
   natureBuffer(e) {
-    const key = 'nat:' + e.voice + ':' + JSON.stringify(e.params || {}) + ':' + (e.dist ?? '') + ':' + e.x.toFixed(3) + ':' + (e.dur ?? '');
+    const key = natureKey(e);
     if (!this.buffers[key]) {
-      const sr = this.sr, p = e.params || {};
-      const make = {
-        footstep: () => V.footstep(sr, p), haulout: () => V.tetrapodHaulOut(sr, p), boom: () => V.theropodBoom(sr, p),
-        hiss: () => V.lizardHiss(sr, p), bark: () => V.foxBarks(sr, p), panthoot: () => V.pantHoot(sr, p), torch: () => V.torch(sr, p),
-        frog: () => V.frogCall(sr, p), surf: () => V.surf(sr, e.dur, p), wind: () => V.wind(sr, e.dur, p), flock: () => V.flock(sr, e.dur, p),
-      }[e.voice];
-      if (!make) throw new Error('unknown nature voice ' + e.voice);
-      let x = make();
-      if (x instanceof Float32Array) x = outdoor(sr, x, { distance: e.dist ?? 12, hs: e.hs ?? 1, pan: Math.max(-1, Math.min(1, (e.x || 0) * 0.85)), seed: 7 + (key.length % 97) });
-      normalize(x, e.peakDb ?? -6);
-      const b = this.ctx.createBuffer(2, x.L.length, sr); b.copyToChannel(x.L, 0); b.copyToChannel(x.R, 1);
+      const x = this.cache.data[key] || natureData(this.sr, e);
+      const b = this.ctx.createBuffer(2, x.L.length, this.sr); b.copyToChannel(x.L, 0); b.copyToChannel(x.R, 1);
       this.buffers[key] = b;
     }
     return this.buffers[key];
@@ -729,20 +742,22 @@ export class ScoreEngine {
     return g;
   }
   s_crackle(e, w, offset = 0) {
-    const g = this.bufferVoice('crackle', this.buffers.crackle ? null : crackleData(this.sr, e), e, w, offset);
+    const pre = this.cache.data.crackle;
+    const g = this.bufferVoice('crackle', this.buffers.crackle ? null : (pre ? [pre.L, pre.R] : crackleData(this.sr, e)), e, w, offset);
     g.gain.value = 0.5;
     g.connect(this.sfxBus);
     const wg = this.ctx.createGain(); wg.gain.value = 0.15; g.connect(wg); wg.connect(this.verbIn);
   }
   s_keys(e, w, offset = 0) {
-    const g = this.bufferVoice('keys', this.buffers.keys ? null : keysData(this.sr, e), e, w, offset);
+    const pre = this.cache.data.keys;
+    const g = this.bufferVoice('keys', this.buffers.keys ? null : (pre ? [pre.L, pre.R] : keysData(this.sr, e)), e, w, offset);
     g.gain.value = 0.55;
     g.connect(this.sfxBus);
     const wg = this.ctx.createGain(); wg.gain.value = 0.12; g.connect(wg); wg.connect(this.verbIn);
   }
   startDrone(filmT = 0) {
     if (!this.buffers.drone) {
-      const d = droneData(this.sr);
+      const pre = this.cache.data.drone, d = pre ? [pre.L, pre.R] : droneData(this.sr);
       const b = this.ctx.createBuffer(2, d[0].length, this.sr); b.copyToChannel(d[0], 0); b.copyToChannel(d[1], 1);
       this.buffers.drone = b;
     }

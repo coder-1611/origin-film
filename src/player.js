@@ -53,9 +53,14 @@ export async function startPlayer(film) {
 
   // ------------------------------------------------------------------ state
   let ctx = null, engine = null, playing = false, filmT = +(q.get('t') || 0), muted = false;
-  const cache = { ks: new Map(), buffers: {} };
+  const cache = { ks: new Map(), buffers: {}, data: {} };
+  // Synthesise the heavy precomputed sounds off the main thread from page load (see warm-worker.js).
+  try {
+    const warm = new Worker(new URL('./audio/warm-worker.js', import.meta.url), { type: 'module' });
+    warm.onmessage = (m) => { if (m.data.key) cache.data[m.data.key] = { L: m.data.L, R: m.data.R }; else if (m.data.done) warm.terminate(); };
+  } catch (err) { console.warn('[player] warm-up worker unavailable; sounds synthesise on demand', err); }
   let masterGain = 1;
-  try { const m = await (await fetch('renders/master.json', { cache: 'no-store' })).json(); masterGain = Math.pow(10, (m.gainDb || 0) / 20); } catch {}
+  try { const m = await (await fetch('src/assets/master.json', { cache: 'no-store' })).json(); masterGain = Math.pow(10, (m.gainDb || 0) / 20); } catch {}
   let showInfo = q.has('info'), lastRenderMs = 0, fpsEMA = 0, lastFrameAt = 0, pumpTimer = null;
 
   function ensureAudio() {
@@ -71,7 +76,22 @@ export async function startPlayer(film) {
   }
   const nowFilm = () => (playing && engine ? ctx.currentTime - engine.origin : filmT);
 
+  // Pre-compile every chapter's shaders while the play screen is up: render the film off-screen at
+  // moments that cover each chapter's distinct phases (WebGL compiles a program on first draw, which
+  // otherwise lands as a visible hitch at the Big Bang, the nebula, the glare, Theia…). Each step is
+  // one frame; it stops as soon as playback starts.
+  const WARM = [0.05, 5, 12.02, 12.3, 20, 30.5, 32.2, 40, 46, 52, 57.4, 60.8, 69.4, 72, 78, 82.5, 90, 98, 100.5, 102.2, 104,
+    107, 115, 122, 126.2, 130, 139, 141, 144, 147, 150.5, 152, 155, 160, 170, 178, 180.5, 184, 188.6, 192.5, 196, 199.5];
+  let warmI = 0, warmStop = false;
+  const warmStep = () => {
+    if (warmStop || warmI >= WARM.length) return;
+    try { film.renderTo(WARM[warmI++], film.ldr); } catch (e) { console.warn('[player] warm frame failed', e); }
+    setTimeout(warmStep, 0);
+  };
+  setTimeout(warmStep, 100);
+
   function play() {
+    warmStop = true;
     ensureAudio();
     if (filmT >= T.DURATION - 0.02) filmT = 0;
     playing = true;

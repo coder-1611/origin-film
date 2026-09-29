@@ -35,4 +35,5 @@ const wrapJump = Math.max(Math.abs(y[0] - y[y.length - 2]), Math.abs(y[1] - y[y.
 writeWavF32(path.join(ROOT, 'renders/score.wav'), y, SR);
 const report = { lufs: +lufs.toFixed(2), truePeakDbtp: +tp.toFixed(2), gainDb: +gainDb.toFixed(2), wrapJump, p99Step: steps[Math.floor(steps.length * 0.99)], medianStep: steps[steps.length >> 1] };
 fs.writeFileSync(path.join(ROOT, 'renders/master.json'), JSON.stringify(report, null, 2));
+fs.writeFileSync(path.join(ROOT, 'src/assets/master.json'), JSON.stringify(report, null, 2));   // the live player's gain
 console.log('master', JSON.stringify(report));
